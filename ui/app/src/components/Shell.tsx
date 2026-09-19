@@ -6,7 +6,7 @@ import {type DemoUser} from '../models'
 import {SudoTerminal} from './SudoTerminal'
 
 export function Shell({children}: {children: ReactNode}) {
-  const {authenticated, loading, canSignIn, signIn, username, sudo, signOut} = useAuth()
+  const {authenticated, loading, canSignIn, signIn, username, sudo} = useAuth()
   const [sudoOpen, setSudoOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [users, setUsers] = useState<DemoUser[]>([])
@@ -23,16 +23,15 @@ export function Shell({children}: {children: ReactNode}) {
       <Link className="brand" to="/content"><span className="brand-prompt">~/</span> Urpi's backlog
         <span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>
       <div className="header-actions">
-        {!loading && <span className="mode-badge">{authenticated ? `${username ?? 'Owner'} · sudo` : 'Anonymous · read-only'}</span>}
+        {!loading && <button className="mode-badge" type="button" onClick={() => {
+          if (authenticated) return
+          if (users.length > 0) setSudoOpen(true)
+          else if (canSignIn) signIn()
+        }}>
+          {authenticated ? `${username ?? 'Owner'} · sudo` : 'Anonymous · read-only'}
+        </button>}
         <button className="theme-button" type="button" aria-label="Demo users"
           onClick={() => setHelpOpen(value => !value)}>?</button>
-        {!loading && !authenticated && users.length > 0 &&
-          <button className="theme-button" type="button" onClick={() => setSudoOpen(true)}>sudo</button>}
-        {!loading && authenticated && users.length > 0 &&
-          <button className="theme-button" type="button" onClick={signOut}>logout</button>}
-        {!loading && !authenticated && canSignIn &&
-          <button className="google-button session-button" type="button" onClick={signIn}>
-            <span aria-hidden="true">G</span> Sign in with Google</button>}
         <button className="theme-button" type="button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`}
           onClick={() => setDark(value => !value)}>{dark ? '☀ Light' : '☾ Dark'}</button>
       </div>

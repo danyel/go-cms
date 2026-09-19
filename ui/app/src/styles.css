@@ -26,6 +26,7 @@ button, select { cursor: pointer; }
 .theme-button { border: 1px solid #45475a; border-radius: 8px; background: #313244; color: #bac2de; padding: 8px 12px; }
 .theme-button:hover { border-color: #cba6f7; color: #f5e0e8; }
 .mode-badge { border: 1px solid #45475a; border-radius: 999px; padding: 6px 11px; color: #a6adc8; background: #242438; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.mode-badge:hover { border-color: #cba6f7; color: #f5e0e8; }
 .google-button { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #585b70; border-radius: 8px; background: #313244; color: #cdd6f4; cursor: pointer; padding: 8px 12px; font-weight: 650; }
 .google-button:hover { background: #45475a; border-color: #89b4fa; }
 .google-button span { color: #89b4fa; font-weight: 800; }

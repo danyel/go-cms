@@ -4,10 +4,11 @@ IMAGE ?= cms-demo
 TAG ?= latest
 REGISTRY_IMAGE ?= batty1039.startdedicated.net:5000/cms-demo
 
-.PHONY: help ui backend demo production run test check docker docker-push docker-run clean
+.PHONY: help ui frontend backend demo production run test check docker docker-push docker-run clean
 
 help:
 	@echo "make ui         build the React app into cmd/server/web/dist"
+	@echo "make frontend   run the Vite UI with API changes proxied to :8080"
 	@echo "make backend    run the Go server on :8080 (serves the last UI build)"
 	@echo "make demo       run the in-memory demo profile"
 	@echo "make production run the SSO production profile"
@@ -29,6 +30,12 @@ ui:
 	rm -rf cmd/server/web/dist
 	mkdir -p cmd/server/web/dist
 	cp -R ui/dist/. cmd/server/web/dist/
+
+frontend:
+	@if [ ! -d ui/app/node_modules ]; then \
+		npm --prefix ui/app ci; \
+	fi
+	npm --prefix ui/app run dev -- --host 0.0.0.0
 
 backend:
 	set -a; [ ! -f .env ] || . ./.env; set +a; \
