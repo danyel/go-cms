@@ -37,6 +37,7 @@ func (h *Handler) Routes(origins string) http.Handler {
 	mux.HandleFunc("/api/test/protected", h.protected)
 	mux.HandleFunc("/api/protected", h.protected)
 	mux.HandleFunc("/api/content", h.contentList)
+	mux.HandleFunc("/api/content/categories", h.contentCategories)
 	mux.HandleFunc("/api/content/", h.contentDetail)
 	return cors(mux, origins)
 }
@@ -171,12 +172,42 @@ func (h *Handler) contentList(w http.ResponseWriter, r *http.Request) {
 	limit, offset := 20, 0
 	_, _ = fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
 	_, _ = fmt.Sscanf(r.URL.Query().Get("offset"), "%d", &offset)
-	items, e := h.content.List(r.Context(), limit, offset)
+	badges := r.URL.Query()["badge"]
+	if len(badges) == 0 {
+		badges = strings.Split(strings.TrimSpace(r.URL.Query().Get("badges")), ",")
+	}
+	filtered := badges[:0]
+	for _, badge := range badges {
+		if badge = strings.TrimSpace(strings.ToLower(badge)); badge != "" {
+			filtered = append(filtered, badge)
+		}
+	}
+	items, e := h.content.List(r.Context(), limit, offset, strings.TrimSpace(strings.ToLower(r.URL.Query().Get("category"))), filtered)
 	if e != nil {
 		jsonWrite(w, 500, map[string]string{"error": e.Error()})
 		return
 	}
 	jsonWrite(w, 200, map[string]any{"items": items, "limit": limit, "offset": offset})
+}
+func (h *Handler) contentCategories(w http.ResponseWriter, r *http.Request) {
+	if h.content == nil {
+		jsonWrite(w, 503, map[string]string{"error": "content unavailable"})
+		return
+	}
+	if _, ok := h.sessionForRequest(r); !ok {
+		jsonWrite(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		jsonWrite(w, http.StatusMethodNotAllowed, nil)
+		return
+	}
+	categories, err := h.content.ListCategories(r.Context())
+	if err != nil {
+		jsonWrite(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonWrite(w, 200, map[string]any{"items": categories})
 }
 func (h *Handler) contentDetail(w http.ResponseWriter, r *http.Request) {
 	if h.content == nil {

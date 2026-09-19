@@ -12,7 +12,8 @@ import (
 )
 
 type IContentService interface {
-	List(context.Context, int, int) ([]domain.Content, error)
+	List(context.Context, int, int, string, []string) ([]domain.Content, error)
+	ListCategories(context.Context) ([]domain.Category, error)
 	Get(context.Context, string) (domain.Content, error)
 	Update(context.Context, domain.Content, domain.Session) (domain.Content, error)
 }
@@ -24,7 +25,7 @@ type ContentService struct {
 func NewContentService(r repository.IContentRepository, a *AuthService) *ContentService {
 	return &ContentService{repo: r, auth: a}
 }
-func (s *ContentService) List(ctx context.Context, limit, offset int) ([]domain.Content, error) {
+func (s *ContentService) List(ctx context.Context, limit, offset int, category string, badges []string) ([]domain.Content, error) {
 	if limit < 1 {
 		limit = 20
 	}
@@ -34,7 +35,10 @@ func (s *ContentService) List(ctx context.Context, limit, offset int) ([]domain.
 	if offset < 0 {
 		offset = 0
 	}
-	return s.repo.List(ctx, limit, offset)
+	return s.repo.List(ctx, limit, offset, category, badges)
+}
+func (s *ContentService) ListCategories(ctx context.Context) ([]domain.Category, error) {
+	return s.repo.ListCategories(ctx)
 }
 func (s *ContentService) Get(ctx context.Context, slug string) (domain.Content, error) {
 	if !validSlug(slug) {

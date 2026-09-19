@@ -66,6 +66,8 @@ export type Content = {
   summary: string
   body: string
   status: string
+  category?: string
+  badges?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -81,8 +83,8 @@ export type ContentListResponse = {
   limit?: number
 }
 
-function normalizeContent(value: Content & { ID?: string; Slug?: string; Title?: string; Summary?: string; Body?: string; Status?: string }): Content {
-  return { id: value.id ?? value.Slug ?? String(value.ID ?? ''), title: value.title ?? value.Title ?? '', summary: value.summary ?? value.Summary ?? '', body: value.body ?? value.Body ?? '', status: value.status ?? value.Status ?? '', createdAt: value.createdAt, updatedAt: value.updatedAt }
+function normalizeContent(value: Content & { ID?: string; Slug?: string; Title?: string; Summary?: string; Body?: string; Status?: string; Category?: string; Badges?: string[] }): Content {
+  return { id: value.id ?? value.Slug ?? String(value.ID ?? ''), title: value.title ?? value.Title ?? '', summary: value.summary ?? value.Summary ?? '', body: value.body ?? value.Body ?? '', status: value.status ?? value.Status ?? '', category: value.category ?? value.Category, badges: value.badges ?? value.Badges ?? [], createdAt: value.createdAt, updatedAt: value.updatedAt }
 }
 
 async function contentRequest<T>(path = '', init?: RequestInit): Promise<T> {
@@ -98,14 +100,25 @@ async function contentRequest<T>(path = '', init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function listContent(cursor?: string | null): Promise<ContentListResponse> {
-  const query = cursor ? `?offset=${encodeURIComponent(cursor)}` : ''
+export async function listContent(cursor?: string | null, category = '', badges: string[] = []): Promise<ContentListResponse> {
+  const params = new URLSearchParams()
+  if (cursor) params.set('offset', cursor)
+  if (category) params.set('category', category)
+  badges.forEach(badge => params.append('badge', badge))
+  const query = params.toString() ? `?${params.toString()}` : ''
   const response = await contentRequest<ContentListResponse | (Content & { ID?: string; Slug?: string; Title?: string; Summary?: string; Body?: string; Status?: string })[]>(query)
   if (Array.isArray(response)) return { items: response.map(normalizeContent), nextCursor: null }
   const items = (response.items ?? response.content ?? response.data ?? []).map(normalizeContent)
   const offset = response.offset ?? (cursor ? Number(cursor) : 0)
   const limit = response.limit ?? 20
   return { ...response, items, nextCursor: items.length >= limit ? String(offset + items.length) : null }
+}
+
+export type Category = { id: string; slug: string; name: string }
+
+export async function listCategories(): Promise<Category[]> {
+  const response = await contentRequest<{ items?: Array<Category & { ID?: string; Slug?: string; Name?: string }> }>('/categories')
+  return (response.items ?? []).map(item => ({ id: item.id ?? item.ID ?? '', slug: item.slug ?? item.Slug ?? '', name: item.name ?? item.Name ?? '' }))
 }
 
 export function getContent(id: string): Promise<Content> {

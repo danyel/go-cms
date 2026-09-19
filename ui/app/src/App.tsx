@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { getContent, listContent, updateContent, type Content, type ContentUpdate } from './api'
+import { getContent, listCategories, listContent, updateContent, type Category, type Content, type ContentUpdate } from './api'
 import { useAuth } from './auth'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -36,6 +36,7 @@ function ContentCard({ item }: { item: Content }) {
     <span className="status">{item.status}</span>
     <h2><Link to={`/content/${item.id}`}>{item.title}</Link></h2>
     <p>{item.summary}</p>
+    {item.badges && item.badges.length > 0 && <div className="badge-list">{item.badges.map(badge => <span className="badge" key={badge}>{badge}</span>)}</div>}
     <Link className="read-link" to={`/content/${item.id}`}>Read more <span aria-hidden="true">→</span></Link>
   </article>
 }
@@ -45,15 +46,22 @@ function ContentList() {
   const [cursor, setCursor] = useState<string | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [category, setCategory] = useState('')
+  const [badges, setBadges] = useState<string[]>([])
+  const [badgeInput, setBadgeInput] = useState('')
   const loadingMore = useRef(false)
+  const requestVersion = useRef(0)
   const sentinel = useRef<HTMLDivElement>(null)
 
   const load = async (next = false) => {
     if (loadingMore.current || (next && !cursor)) return
+    const version = next ? requestVersion.current : ++requestVersion.current
     loadingMore.current = true
     setLoading(true)
     try {
-      const response = await listContent(next ? cursor : undefined)
+      const response = await listContent(next ? cursor : undefined, category, badges)
+      if (version !== requestVersion.current) return
       const page = Array.isArray(response) ? response : response.items ?? response.content ?? response.data ?? []
       setItems(current => next ? [...current, ...page] : page)
       setCursor(Array.isArray(response) ? null : response.nextCursor ?? response.cursor ?? (response.hasMore ? undefined : null))
@@ -61,11 +69,19 @@ function ContentList() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load content.')
     } finally {
-      loadingMore.current = false
-      setLoading(false)
+      if (version === requestVersion.current) {
+        loadingMore.current = false
+        setLoading(false)
+      }
     }
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void listCategories().then(setCategories).catch(() => setCategories([])) }, [])
+  useEffect(() => {
+    loadingMore.current = false
+    setItems([])
+    setCursor(undefined)
+    void load()
+  }, [category, badges.join(',')])
   useEffect(() => {
     const node = sentinel.current
     if (!node) return
@@ -76,6 +92,26 @@ function ContentList() {
 
   return <Shell><section className="content-page">
     <div className="page-heading"><div><span className="eyebrow">Journal</span><h1>Latest content</h1></div></div>
+    <div className="filters" aria-label="Content filters">
+      <label className="category-filter">Category
+        <select value={category} onChange={event => setCategory(event.target.value)}>
+          <option value="">All categories</option>
+          {categories.map(item => <option value={item.slug} key={item.slug}>{item.name}</option>)}
+        </select>
+      </label>
+      <label className="badge-filter">Badges
+        <div className="badge-input">
+          {badges.map(badge => <span className="filter-pill" key={badge}>{badge}<button type="button" aria-label={`Remove ${badge}`} onClick={() => setBadges(current => current.filter(value => value !== badge))}>×</button></span>)}
+          <input value={badgeInput} placeholder="Type a badge and press Enter" onChange={event => setBadgeInput(event.target.value)} onKeyDown={event => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            const badge = badgeInput.trim().toLowerCase()
+            if (badge && !badges.includes(badge)) setBadges(current => [...current, badge])
+            setBadgeInput('')
+          }} />
+        </div>
+      </label>
+    </div>
     {error && <p className="error" role="alert">{error}</p>}
     {!loading && !error && items.length === 0 && <div className="card empty-state"><h2>No content yet</h2><p className="muted">There is nothing published here yet.</p></div>}
     <div className="content-grid">{items.map(item => <ContentCard item={item} key={item.id} />)}</div>

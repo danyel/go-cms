@@ -63,18 +63,36 @@ func (r *GORMSessionRepository) FindValid(ctx context.Context, t string) (domain
 type GORMContentRepository struct{ db *gorm.DB }
 
 func NewContentRepository(db *gorm.DB) IContentRepository { return &GORMContentRepository{db} }
-func (r *GORMContentRepository) List(ctx context.Context, limit, offset int) ([]domain.Content, error) {
+func (r *GORMContentRepository) List(ctx context.Context, limit, offset int, category string, badges []string) ([]domain.Content, error) {
 	var rows []persistence.ContentModel
-	err := r.db.WithContext(ctx).Order("updated_at DESC, created_at DESC, id DESC").Limit(limit).Offset(offset).Find(&rows).Error
+	query := r.db.WithContext(ctx).Model(&persistence.ContentModel{}).Preload("Category").Preload("Badges")
+	if category != "" {
+		query = query.Where("category_id IN (SELECT id FROM categories WHERE slug = ?)", category)
+	}
+	for _, badge := range badges {
+		query = query.Where("EXISTS (SELECT 1 FROM content_badges cb JOIN badges b ON b.id = cb.badge_id WHERE cb.content_id = content.id AND b.name = ?)", badge)
+	}
+	err := query.Order("updated_at DESC, created_at DESC, id DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	out := make([]domain.Content, len(rows))
 	for i := range rows {
 		out[i] = persistence.ContentToDomain(rows[i])
 	}
 	return out, err
 }
+func (r *GORMContentRepository) ListCategories(ctx context.Context) ([]domain.Category, error) {
+	var rows []persistence.CategoryModel
+	if err := r.db.WithContext(ctx).Order("name ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.Category, len(rows))
+	for i := range rows {
+		out[i] = domain.Category{ID: rows[i].ID, Slug: rows[i].Slug, Name: rows[i].Name}
+	}
+	return out, nil
+}
 func (r *GORMContentRepository) FindBySlug(ctx context.Context, slug string) (domain.Content, error) {
 	var row persistence.ContentModel
-	if err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Category").Preload("Badges").Where("slug = ?", slug).First(&row).Error; err != nil {
 		return domain.Content{}, err
 	}
 	return persistence.ContentToDomain(row), nil

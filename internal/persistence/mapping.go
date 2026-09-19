@@ -9,7 +9,11 @@ func UserFromDomain(d domain.User) UserModel {
 	return UserModel{ID: d.ID, Email: d.Email, Name: d.Name, Provider: d.Provider, ProviderSubject: d.ProviderSubject, Role: d.Role, Editor: d.Editor, CreatedAt: d.CreatedAt}
 }
 func ContentToDomain(m ContentModel) domain.Content {
-	return domain.Content{ID: m.ID, Slug: m.Slug, Title: m.Title, Summary: m.Summary, Body: m.Body, Status: m.Status, Published: m.Published, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, CreatedBy: m.CreatedBy, UpdatedBy: m.UpdatedBy}
+	badges := make([]string, len(m.Badges))
+	for i := range m.Badges {
+		badges[i] = m.Badges[i].Name
+	}
+	return domain.Content{ID: m.ID, Slug: m.Slug, Title: m.Title, Summary: m.Summary, Body: m.Body, Status: m.Status, Published: m.Published, CategoryID: m.CategoryID, Category: m.Category.Name, Badges: badges, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, CreatedBy: m.CreatedBy, UpdatedBy: m.UpdatedBy}
 }
 func ContentFromDomain(d domain.Content) ContentModel {
 	return ContentModel{ID: d.ID, Slug: d.Slug, Title: d.Title, Summary: d.Summary, Body: d.Body, Status: d.Status, Published: d.Published, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy}

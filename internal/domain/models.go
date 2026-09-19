@@ -28,8 +28,17 @@ type Content struct {
 	Slug, Title, Summary, Body string
 	Status                     string
 	Published                  bool
+	CategoryID                 uint
+	Category                   string
+	Badges                     []string
 	CreatedAt, UpdatedAt       time.Time
 	CreatedBy, UpdatedBy       uint
+}
+
+type Category struct {
+	ID   uint
+	Slug string
+	Name string
 }
 
 type ContentHistory struct {
