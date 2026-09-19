@@ -10,12 +10,18 @@ type UserModel struct {
 	ProviderSubject string `gorm:"uniqueIndex;not null"`
 	CreatedAt       time.Time
 }
+
+func (UserModel) TableName() string { return "users" }
+
 type AdminModel struct {
 	ID        uint   `gorm:"primaryKey"`
 	Email     string `gorm:"uniqueIndex;not null"`
 	Name      string
 	CreatedAt time.Time
 }
+
+func (AdminModel) TableName() string { return "admins" }
+
 type SessionModel struct {
 	ID        uint   `gorm:"primaryKey"`
 	Token     string `gorm:"uniqueIndex;not null"`
@@ -24,3 +30,5 @@ type SessionModel struct {
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
+
+func (SessionModel) TableName() string { return "sessions" }

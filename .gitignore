@@ -7,8 +7,7 @@ bin/
 *.sqlite
 *.sqlite3
 .env
-.env.*
-!.env.example
+client_secret*.json
 
 # Node
 node_modules/

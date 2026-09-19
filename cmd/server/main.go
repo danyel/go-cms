@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -12,31 +13,73 @@ import (
 	"github.com/example/cms/internal/service"
 	"github.com/example/cms/internal/web"
 	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/database"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/admin/*.sql migrations/postgres/*.sql
 var migrations embed.FS
 
 func main() {
-	cfg := config.Load()
-	db, err := gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
-	sqlDB, err := db.DB()
+	adminDB, err := gorm.Open(sqlite.Open(cfg.AdminDatabaseURL), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	provider, err := goose.NewProvider(goose.DialectSQLite3, sqlDB, migrations)
+	applicationDB, err := gorm.Open(postgres.Open(cfg.ApplicationDatabaseURL), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err = provider.Up(context.Background()); err != nil {
+	adminSQLDB, err := adminDB.DB()
+	if err != nil {
 		log.Fatal(err)
 	}
-	auth := service.NewAuthService(repository.NewUserRepository(db), repository.NewAdminRepository(db), repository.NewSessionRepository(db), cfg.SessionTTL)
+	adminMigrations, err := fs.Sub(migrations, "migrations/admin")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminStore, err := database.NewStore(goose.DialectSQLite3, "goose_admin_db_version")
+	if err != nil {
+		log.Fatal(err)
+	}
+	adminProvider, err := goose.NewProvider("", adminSQLDB, adminMigrations, goose.WithStore(adminStore))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err = adminProvider.Up(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+	applicationSQLDB, err := applicationDB.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	applicationMigrations, err := fs.Sub(migrations, "migrations/postgres")
+	if err != nil {
+		log.Fatal(err)
+	}
+	applicationStore, err := database.NewStore(goose.DialectPostgres, "goose_application_db_version")
+	if err != nil {
+		log.Fatal(err)
+	}
+	applicationProvider, err := goose.NewProvider("", applicationSQLDB, applicationMigrations, goose.WithStore(applicationStore))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err = applicationProvider.Up(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+	auth := service.NewAuthServiceWithSeparateSessions(
+		repository.NewUserRepository(applicationDB),
+		repository.NewAdminRepository(adminDB),
+		repository.NewSessionRepository(applicationDB),
+		repository.NewSessionRepository(adminDB),
+		cfg.SessionTTL,
+	)
 	google := identity.GoogleProvider{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret, RedirectURL: cfg.GoogleRedirectURL}
 	log.Printf("CMS listening on %s", cfg.HTTPAddr)
 	if err = http.ListenAndServe(cfg.HTTPAddr, web.NewHandler(auth, google).Routes(cfg.AllowedOrigins)); err != nil {

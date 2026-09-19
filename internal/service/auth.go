@@ -21,14 +21,19 @@ type IAdminAuthService interface {
 	Authenticate(context.Context, string) (domain.Session, error)
 }
 type AuthService struct {
-	users    repository.IUserRepository
-	admins   repository.IAdminRepository
-	sessions repository.ISessionRepository
-	ttl      time.Duration
+	users         repository.IUserRepository
+	admins        repository.IAdminRepository
+	userSessions  repository.ISessionRepository
+	adminSessions repository.ISessionRepository
+	ttl           time.Duration
 }
 
-func NewAuthService(u repository.IUserRepository, a repository.IAdminRepository, s repository.ISessionRepository, ttl time.Duration) *AuthService {
-	return &AuthService{u, a, s, ttl}
+func NewAuthService(u repository.IUserRepository, a repository.IAdminRepository, sessions repository.ISessionRepository, ttl time.Duration) *AuthService {
+	return NewAuthServiceWithSeparateSessions(u, a, sessions, sessions, ttl)
+}
+
+func NewAuthServiceWithSeparateSessions(u repository.IUserRepository, a repository.IAdminRepository, userSessions, adminSessions repository.ISessionRepository, ttl time.Duration) *AuthService {
+	return &AuthService{users: u, admins: a, userSessions: userSessions, adminSessions: adminSessions, ttl: ttl}
 }
 func (s *AuthService) Login(ctx context.Context, id identity.Identity) (domain.User, string, error) {
 	if strings.TrimSpace(id.Email) == "" || strings.TrimSpace(id.Subject) == "" {
@@ -42,13 +47,13 @@ func (s *AuthService) Login(ctx context.Context, id identity.Identity) (domain.U
 	if e != nil {
 		return domain.User{}, "", e
 	}
-	if e = s.sessions.Create(ctx, domain.Session{Token: t, UserID: &u.ID, ExpiresAt: time.Now().Add(s.ttl), CreatedAt: time.Now()}); e != nil {
+	if e = s.userSessions.Create(ctx, domain.Session{Token: t, UserID: &u.ID, ExpiresAt: time.Now().Add(s.ttl), CreatedAt: time.Now()}); e != nil {
 		return domain.User{}, "", e
 	}
 	return u, t, nil
 }
 func (s *AuthService) Authenticate(ctx context.Context, t string) (domain.Session, error) {
-	return s.sessions.FindValid(ctx, t)
+	return s.userSessions.FindValid(ctx, t)
 }
 func (s *AuthService) AdminLogin(ctx context.Context, email string) (domain.Admin, string, error) {
 	a, e := s.admins.FindByEmail(ctx, email)
@@ -59,13 +64,13 @@ func (s *AuthService) AdminLogin(ctx context.Context, email string) (domain.Admi
 	if e != nil {
 		return domain.Admin{}, "", e
 	}
-	if e = s.sessions.Create(ctx, domain.Session{Token: t, AdminID: &a.ID, ExpiresAt: time.Now().Add(s.ttl), CreatedAt: time.Now()}); e != nil {
+	if e = s.adminSessions.Create(ctx, domain.Session{Token: t, AdminID: &a.ID, ExpiresAt: time.Now().Add(s.ttl), CreatedAt: time.Now()}); e != nil {
 		return domain.Admin{}, "", e
 	}
 	return a, t, nil
 }
 func (s *AuthService) AdminAuthenticate(ctx context.Context, t string) (domain.Session, error) {
-	return s.Authenticate(ctx, t)
+	return s.adminSessions.FindValid(ctx, t)
 }
 func newToken() (string, error) {
 	b := make([]byte, 32)

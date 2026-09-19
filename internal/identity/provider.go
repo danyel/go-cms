@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"net/http"
@@ -37,7 +38,7 @@ func (p GoogleProvider) FetchIdentity(ctx context.Context, code string) (Identit
 	}
 	token, err := p.OAuthConfig().Exchange(ctx, code)
 	if err != nil {
-		return Identity{}, err
+		return Identity{}, fmt.Errorf("exchange authorization code: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://openidconnect.googleapis.com/v1/userinfo", nil)
 	if err != nil {
@@ -50,7 +51,7 @@ func (p GoogleProvider) FetchIdentity(ctx context.Context, code string) (Identit
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return Identity{}, errors.New("google userinfo request failed")
+		return Identity{}, fmt.Errorf("Google userinfo request failed with status %s", resp.Status)
 	}
 	var profile struct {
 		Subject string `json:"sub"`

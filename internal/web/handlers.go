@@ -7,6 +7,7 @@ import (
 	"github.com/example/cms/internal/identity"
 	"github.com/example/cms/internal/service"
 	"github.com/example/cms/internal/web/mapping"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -52,7 +53,8 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.google.FetchIdentity(r.Context(), r.URL.Query().Get("code"))
 	if err != nil {
-		http.Error(w, "google authentication failed", http.StatusUnauthorized)
+		log.Printf("Google OAuth callback failed: %v", err)
+		http.Error(w, "google authentication failed; start a new sign-in attempt", http.StatusUnauthorized)
 		return
 	}
 	user, token, err := h.auth.Login(r.Context(), id)

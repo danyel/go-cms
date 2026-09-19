@@ -44,7 +44,8 @@ type GORMSessionRepository struct{ db *gorm.DB }
 
 func NewSessionRepository(db *gorm.DB) ISessionRepository { return &GORMSessionRepository{db} }
 func (r *GORMSessionRepository) Create(ctx context.Context, d domain.Session) error {
-	return r.db.WithContext(ctx).Create(persistence.SessionFromDomain(d)).Error
+	model := persistence.SessionFromDomain(d)
+	return r.db.WithContext(ctx).Create(&model).Error
 }
 func (r *GORMSessionRepository) FindValid(ctx context.Context, t string) (domain.Session, error) {
 	var m persistence.SessionModel
