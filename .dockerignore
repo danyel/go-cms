@@ -1,0 +1,20 @@
+# Keep the build context small and never ship local state.
+.git
+.gitignore
+.idea
+.vscode
+*.md
+.env
+.env.example
+
+# Node and frontend build output
+**/node_modules
+ui/dist
+ui/app/dist
+
+# Go build output
+bin
+
+# Local content store
+*.json.tmp
+data

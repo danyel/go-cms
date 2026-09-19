@@ -2,15 +2,19 @@
 bin/
 *.test
 
-# Local environment and data
+# Frontend build output. The compiled app is embedded from
+# cmd/server/web/dist, which keeps only its committed placeholder in git.
+ui/dist/
+cmd/server/web/dist/*
+!cmd/server/web/dist/placeholder.txt
+
+# Local environment and content store
 .env
-*.db
-*.sqlite
-*.sqlite3
+data/
+*.json.tmp
 
 # Node
 node_modules/
-ui/app/dist/
 ui/app/.vite/
 
 # IDE and OS

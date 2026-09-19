@@ -1,36 +1,60 @@
 SHELL := /bin/sh
 
-COMPOSE ?= docker compose
-GOOSE ?= go run github.com/pressly/goose/v3/cmd/goose@v3.24.3
-POSTGRES_URL ?= postgres://cms:cms@localhost:5432/cms?sslmode=disable
+IMAGE ?= cms-demo
+TAG ?= latest
 
-.PHONY: up down migrate seed backend frontend dev
+.PHONY: help ui backend demo production run test check docker docker-run clean
 
-up:
-	$(COMPOSE) up -d --wait
+help:
+	@echo "make ui         build the React app into cmd/server/web/dist"
+	@echo "make backend    run the Go server on :8080 (serves the last UI build)"
+	@echo "make demo       run the in-memory demo profile"
+	@echo "make production run the SSO production profile"
+	@echo "make run        build the UI, then run the server"
+	@echo "make test       run the Go test suite"
+	@echo "make check      gofmt, vet, and tests"
+	@echo "make docker     build the all-in-one image"
+	@echo "make docker-run run the image on :8080"
+	@echo "make clean      remove build output"
 
-down:
-	$(COMPOSE) down
-
-migrate:
-	$(GOOSE) -dir cmd/server/migrations/postgres postgres "$(POSTGRES_URL)" up
-
-seed:
-	psql "$(POSTGRES_URL)" -v ON_ERROR_STOP=1 -f scripts/seed_content.sql
+# The Go server embeds the compiled frontend, so the UI is built first and copied
+# into the embed directory that cmd/server/main.go points at.
+ui:
+	@if [ ! -d ui/app/node_modules ]; then \
+		npm --prefix ui/app ci; \
+	fi
+	npm --prefix ui/app run build
+	rm -rf cmd/server/web/dist
+	mkdir -p cmd/server/web/dist
+	cp -R ui/dist/. cmd/server/web/dist/
 
 backend:
 	set -a; [ ! -f .env ] || . ./.env; set +a; \
-	CMS_APPLICATION_DATABASE_URL="$${CMS_APPLICATION_DATABASE_URL:-host=localhost user=cms password=cms dbname=cms port=5432 sslmode=disable}" \
 	go run ./cmd/server
 
-frontend:
-	@if [ ! -x ui/app/node_modules/.bin/vite ]; then \
-		npm --prefix ui/app ci; \
-	fi
-	npm --prefix ui/app run dev
+demo:
+	CMS_PROFILE=demo $(MAKE) backend
 
-dev: up migrate
-	@trap 'kill 0' INT TERM; \
-		$(MAKE) backend & \
-		$(MAKE) frontend & \
-		wait
+production:
+	CMS_PROFILE=production $(MAKE) backend
+
+run: ui backend
+
+test:
+	go test ./...
+
+check:
+	gofmt -l ./cmd ./internal
+	go vet ./...
+	go test ./...
+
+docker:
+	docker build -t $(IMAGE):$(TAG) .
+
+docker-run:
+	docker run --rm -p 8080:8080 --env-file .env $(IMAGE):$(TAG)
+
+clean:
+	rm -rf cmd/server/web/dist ui/dist
+	mkdir -p cmd/server/web/dist
+	printf 'Placeholder so the Go embed directive resolves before the frontend is built.\nRun `make ui` to replace this directory with the real React build.\n' > cmd/server/web/dist/placeholder.txt

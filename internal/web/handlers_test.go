@@ -6,28 +6,37 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
-	"github.com/example/cms/internal/domain"
 	"github.com/example/cms/internal/security"
+	"github.com/example/cms/internal/service"
 )
 
 type fakeContent struct{ updated bool }
 
-func (f *fakeContent) List(context.Context, int, int, string, string, []string) ([]domain.Content, error) {
-	return nil, nil
+func (f *fakeContent) List(context.Context, int, int, string, string, []string) ([]service.Content, error) {
+	return []service.Content{{Slug: "post", Title: "Post"}}, nil
 }
-func (f *fakeContent) ListCategories(context.Context) ([]domain.Category, error) { return nil, nil }
-func (f *fakeContent) ListBadges(context.Context) ([]domain.Badge, error)        { return nil, nil }
-func (f *fakeContent) Get(context.Context, string) (domain.Content, error) {
-	return domain.Content{Slug: "post", Title: "Post", Body: "body"}, nil
+func (f *fakeContent) ListCategories(context.Context) ([]service.Category, error) {
+	return []service.Category{{Slug: "go", Name: "Go"}}, nil
 }
-func (f *fakeContent) Update(_ context.Context, c domain.Content) (domain.Content, error) {
+func (f *fakeContent) ListBadges(context.Context) ([]service.Badge, error) {
+	return []service.Badge{{Name: "go"}}, nil
+}
+func (f *fakeContent) Get(context.Context, string) (service.Content, error) {
+	return service.Content{Slug: "post", Title: "Post", Body: "body"}, nil
+}
+func (f *fakeContent) Update(_ context.Context, c service.Content) (service.Content, error) {
 	f.updated = true
 	return c, nil
 }
 
 func newTestRoutes(content *fakeContent) http.Handler {
-	return NewHandler(content, security.NewSSOTokenVerifier("X-SSO-Token", "", "")).Routes("http://localhost:5173")
+	assets := fstest.MapFS{
+		"index.html":      &fstest.MapFile{Data: []byte("<!doctype html><div id=\"root\"></div>")},
+		"assets/index.js": &fstest.MapFile{Data: []byte("console.log('cms')")},
+	}
+	return NewHandler(content, assets, security.NewSSOTokenVerifier("X-SSO-Token", "", "")).Routes("http://localhost:5173")
 }
 
 func TestAnonymousCanReadButNotEdit(t *testing.T) {
@@ -77,5 +86,21 @@ func TestProxyIdentityCanEdit(t *testing.T) {
 	routes.ServeHTTP(sessionRec, session)
 	if !strings.Contains(sessionRec.Body.String(), `"canEdit":true`) {
 		t.Fatalf("owner session = %s", sessionRec.Body.String())
+	}
+}
+
+func TestServesEmbeddedAppForClientRoutes(t *testing.T) {
+	routes := newTestRoutes(&fakeContent{})
+
+	asset := httptest.NewRecorder()
+	routes.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/assets/index.js", nil))
+	if asset.Code != http.StatusOK || !strings.Contains(asset.Body.String(), "console.log") {
+		t.Fatalf("static asset status = %d body = %q", asset.Code, asset.Body.String())
+	}
+
+	page := httptest.NewRecorder()
+	routes.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/content/some-post", nil))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `id="root"`) {
+		t.Fatalf("spa fallback status = %d body = %q", page.Code, page.Body.String())
 	}
 }

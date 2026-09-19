@@ -1,24 +1,25 @@
+// Package config carries the runtime settings for the demo CMS. There is no
+// database to configure: content is seeded in memory and optionally mirrored to
+// a single JSON file.
 package config
 
-import (
-	"os"
-)
+import "os"
 
-// Config carries the runtime settings for the CMS. The application database is
-// the only datastore: identities and sessions belong to the upstream SSO proxy.
 type Config struct {
-	HTTPAddr, ApplicationDatabaseURL               string
+	HTTPAddr, Profile, ContentFile, PostgresURL    string
 	AllowedOrigins, SSOHeader, SSOToken, SSOCookie string
 }
 
 func Load() Config {
 	return Config{
-		HTTPAddr:               get("CMS_HTTP_ADDR", ":8080"),
-		ApplicationDatabaseURL: get("CMS_APPLICATION_DATABASE_URL", "host=localhost user=cms password=cms dbname=cms port=5432 sslmode=disable"),
-		AllowedOrigins:         get("CMS_ALLOWED_ORIGINS", "http://localhost:5173"),
-		SSOHeader:              get("CMS_SSO_HEADER", "X-SSO-Token"),
-		SSOToken:               get("CMS_SSO_TOKEN", ""),
-		SSOCookie:              get("CMS_SSO_COOKIE", ""),
+		HTTPAddr:       get("CMS_HTTP_ADDR", ":8080"),
+		Profile:        get("CMS_PROFILE", "demo"),
+		ContentFile:    get("CMS_CONTENT_FILE", ""),
+		PostgresURL:    get("CMS_POSTGRES_URL", ""),
+		AllowedOrigins: get("CMS_ALLOWED_ORIGINS", "http://localhost:5173"),
+		SSOHeader:      get("CMS_SSO_HEADER", "X-SSO-Token"),
+		SSOToken:       get("CMS_SSO_TOKEN", ""),
+		SSOCookie:      get("CMS_SSO_COOKIE", ""),
 	}
 }
 

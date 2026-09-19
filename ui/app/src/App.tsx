@@ -6,6 +6,7 @@ import {
     type Content,
     type ContentUpdate,
     getContent,
+    listDemoUsers,
     listBadges,
     listCategories,
     listContent,
@@ -14,7 +15,14 @@ import {
 import {useAuth} from './auth'
 
 function Shell({children}: { children: React.ReactNode }) {
-    const {authenticated, loading, canSignIn, signIn} = useAuth()
+    const {authenticated, loading, canSignIn, signIn, username, sudo, signOut} = useAuth()
+    const [sudoOpen, setSudoOpen] = useState(false)
+    const [helpOpen, setHelpOpen] = useState(false)
+    const [users, setUsers] = useState<{username: string; name: string}[]>([])
+    const [user, setUser] = useState('')
+    const [password, setPassword] = useState('')
+    const [sudoError, setSudoError] = useState('')
+    useEffect(() => { void listDemoUsers().then(setUsers) }, [])
     const [dark, setDark] = useState(() => window.localStorage.getItem('urpi-theme') !== 'light')
     useEffect(() => {
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
@@ -24,7 +32,12 @@ function Shell({children}: { children: React.ReactNode }) {
         <header className="header"><Link className="brand" to="/content"><span className="brand-prompt">~/</span> Urpi's
             backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>
             <div className="header-actions">{!loading &&
-                <span className="mode-badge">{authenticated ? 'Owner · SSO' : 'Anonymous · read-only'}</span>}
+                <span className="mode-badge">{authenticated ? `${username ?? 'Owner'} · sudo` : 'Anonymous · read-only'}</span>}
+                <button className="theme-button" type="button" aria-label="Demo users" onClick={() => setHelpOpen(value => !value)}>?</button>
+                {!loading && !authenticated && users.length > 0 &&
+                    <button className="theme-button" type="button" onClick={() => setSudoOpen(true)}>sudo</button>}
+                {!loading && authenticated && users.length > 0 &&
+                    <button className="theme-button" type="button" onClick={signOut}>logout</button>}
                 {!loading && !authenticated && canSignIn &&
                     <button className="google-button session-button" type="button" onClick={signIn}><span
                         aria-hidden="true">G</span> Sign in with Google</button>}
@@ -32,6 +45,34 @@ function Shell({children}: { children: React.ReactNode }) {
                         onClick={() => setDark(value => !value)}>{dark ? '☀ Light' : '☾ Dark'}</button>
             </div>
         </header>
+        {helpOpen && users.length > 0 && <aside className="card terminal-panel">
+            <strong>sudo users</strong><p className="muted">Demo only: each password is the same as the username.</p>
+            {users.map(item => <div key={item.username}><code>sudo {item.username}</code> · {item.name}</div>)}
+        </aside>}
+        {sudoOpen && <div className="terminal-backdrop" role="presentation" onMouseDown={event => {
+            if (event.target === event.currentTarget) setSudoOpen(false)
+        }}>
+            <form className="terminal-window" role="dialog" aria-modal="true" aria-labelledby="sudo-title" onSubmit={event => {
+                event.preventDefault()
+                setSudoError('')
+                void sudo(user, password).then(() => { setSudoOpen(false); setPassword('') }).catch(error => setSudoError(error instanceof Error ? error.message : 'sudo failed'))
+            }}>
+                <div className="terminal-titlebar">
+                    <span id="sudo-title">urpi@backlog: ~</span>
+                    <button type="button" className="terminal-close" aria-label="Close sudo terminal"
+                            onClick={() => setSudoOpen(false)}>×</button>
+                </div>
+                <div className="terminal-body">
+                    <p><span className="terminal-prompt">$</span> sudo login</p>
+                    <label><span className="terminal-prompt">$</span> sudo <input autoFocus value={user}
+                        onChange={event => setUser(event.target.value)} placeholder="user" aria-label="Username"/></label>
+                    <label><span className="terminal-prompt">$</span> password: <input type="password" value={password}
+                        onChange={event => setPassword(event.target.value)} aria-label="Password"/></label>
+                    {sudoError && <p className="terminal-error">{sudoError}</p>}
+                    <button className="terminal-submit" type="submit"><span className="terminal-prompt">$</span> Enter</button>
+                </div>
+            </form>
+        </div>}
         {children}
     </main>
 }
@@ -41,6 +82,10 @@ function ContentCard({item}: { item: Content }) {
         <span className="status">{item.status}</span>
         <h2><Link to={`/content/${item.id}`}>{item.title}</Link></h2>
         <p>{item.summary}</p>
+        <p className="content-meta">
+            by {item.author ?? 'unknown'}
+            {item.publishedAt && <> · published {new Date(item.publishedAt).toLocaleDateString()}</>}
+        </p>
         {item.badges && item.badges.length > 0 &&
             <div className="badge-list">{item.badges.map(badge => <span className="badge"
                                                                         key={badge}>{badge}</span>)}</div>}
@@ -166,7 +211,7 @@ function ContentList() {
 
 function ContentDetail() {
     const {id = ''} = useParams()
-    const {canEdit} = useAuth()
+    const {canEdit, username} = useAuth()
     const [item, setItem] = useState<Content | null>(null)
     const [editing, setEditing] = useState(false)
     const [draft, setDraft] = useState<ContentUpdate | null>(null)
@@ -270,9 +315,9 @@ function ContentDetail() {
                 </div>
             </div> : <>
                 <div className="detail-heading"><span className="status">{item.status}</span><h1>{item.title}</h1><p
-                    className="muted">{item.summary}</p>{item.badges && item.badges.length > 0 &&
+                    className="muted">{item.summary}</p><p className="muted">by {item.author ?? 'unknown'}{item.publishedAt ? ` · published ${new Date(item.publishedAt).toLocaleDateString()}` : ''}</p>{item.badges && item.badges.length > 0 &&
                     <div className="badge-list">{item.badges.map(badge => <span className="badge"
-                                                                                key={badge}>{badge}</span>)}</div>}{canEdit &&
+                                                                                key={badge}>{badge}</span>)}</div>}{canEdit && username === item.author &&
                     <button className="primary-button edit-button" onClick={() => setEditing(true)}>Edit</button>}</div>
                 <div className="body-copy">{item.body}</div>
             </>}
