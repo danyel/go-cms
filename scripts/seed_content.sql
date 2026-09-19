@@ -5,11 +5,11 @@
 --   psql "$POSTGRES_URL" -f scripts/seed_content.sql
 
 INSERT INTO categories (slug, name) VALUES
-    ('engineering', 'Engineering'),
-    ('design', 'Design'),
-    ('product', 'Product'),
-    ('editorial', 'Editorial'),
-    ('community', 'Community')
+    ('linux', 'Linux'),
+    ('bash', 'Bash & Shell'),
+    ('go', 'Go'),
+    ('java', 'Java'),
+    ('devops', 'DevOps')
 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name;
 
 INSERT INTO content (
@@ -391,3 +391,191 @@ FROM (VALUES
 JOIN content c ON c.slug = seed.slug
 JOIN badges b ON b.name = seed.badge
 ON CONFLICT DO NOTHING;
+
+-- Re-theme the repeatable examples around Linux, shell tooling, Go, Java, and DevOps.
+INSERT INTO badges (name) VALUES
+    ('linux'), ('bash'), ('shell'), ('terminal'), ('systemd'), ('grep'),
+    ('awk'), ('sed'), ('ssh'), ('git'), ('journalctl'), ('go'), ('java'), ('spring-boot'),
+    ('maven'), ('postgresql'), ('docker'), ('kubernetes'), ('devops')
+ON CONFLICT (name) DO NOTHING;
+
+UPDATE content AS c
+SET title = seed.title, summary = seed.summary, body = seed.body
+FROM (VALUES
+    ('welcome-to-the-cms', 'Welcome to Urpi''s backlog', 'A terminal-shaped notebook for Linux, Bash, Go, Java, and useful experiments.', $$Welcome to Urpi''s backlog.
+
+This is a working notebook for the tools that make a developer''s day better: a clean Linux shell, a small Bash script, a reliable Go service, and a Java application that is easier to operate.
+
+The best notes are practical. They show the command, explain the why, and leave enough context for future-you to use them again.$$),
+    ('designing-for-clarity', 'Designing a Calm Terminal Workflow', 'Small conventions that make command-line work easier to read, repeat, and recover.', $$A good terminal workflow is easy to scan at a glance.
+
+Use clear prompts, predictable directories, short commands, and output that explains what happened. Keep destructive operations explicit and make the safe path the easy path.
+
+The shell is not only a place to execute commands. It is an interface worth designing.$$),
+    ('a-practical-guide-to-editorial-workflows', 'A Practical Bash Script Workflow', 'How to write shell scripts that are safe to run, easy to debug, and friendly to the next maintainer.', $$A useful Bash script starts with strict mode, meaningful names, and a clear exit path.
+
+Use set -euo pipefail when appropriate, quote variables, validate inputs, and print progress around operations that may take time. Prefer small functions over one long pipeline when the script is important enough to maintain.
+
+Scripts become tools when another person can understand them without reverse engineering the author''s terminal session.$$),
+    ('building-a-better-content-calendar', 'Building a Personal Linux Command Log', 'A simple way to turn repeated terminal discoveries into searchable notes.', $$Whenever a command solves a problem, write down the context with it.
+
+Record the operating system, the input, the useful output, and the reason the command worked. A note such as journalctl -u service --since today is much more valuable when it says which service was failing and what the logs revealed.
+
+Over time, the command log becomes a small, personal operations manual.$$),
+    ('the-case-for-small-releases', 'The Case for Small CLI Releases', 'Why focused command-line improvements are easier to test, ship, and roll back.', $$A small release is easier to inspect with git diff, test from a clean shell, and undo when it does not behave as expected.
+
+This is especially useful for developer tools. A narrow change to a flag or output format gives users a clear upgrade path and gives maintainers a focused set of failure modes.
+
+Small releases keep the feedback loop close to the command that changed.$$),
+    ('how-we-write-useful-documentation', 'How to Document a Bash Command', 'A command is not documented until someone knows what it changes and how to undo it.', $$Good shell documentation shows a complete example, explains expected output, and calls out permissions or paths that matter.
+
+Always distinguish a read-only command from one that modifies files or services. Include a dry-run option when possible and show the recovery command beside the change.
+
+The goal is not more prose. It is a safer next terminal session.$$),
+    ('accessibility-is-a-quality-practice', 'Readable Output Is a Quality Practice', 'Terminal output should work in bright rooms, small windows, logs, and automated checks.', $$Readable output uses stable labels, useful exit codes, and enough spacing to separate one result from the next.
+
+Do not rely on color alone. A warning should still be clear when output is redirected to a file or viewed through SSH. Good command-line output helps both humans and scripts.
+
+Accessibility is another word for making the right information available in the conditions people actually work in.$$),
+    ('measuring-what-matters', 'Measuring a Service from the Shell', 'A few dependable commands can tell you more than a noisy dashboard.', $$Start with the signals that answer an operational question: is the process running, is the port listening, are requests succeeding, and is the disk filling up?
+
+Commands such as systemctl status, ss, curl, df, and journalctl are powerful because they connect directly to the machine''s state.
+
+Measure what helps you choose the next command, not what merely looks impressive.$$),
+    ('notes-from-a-content-migration', 'Notes from a PostgreSQL Migration', 'Lessons from moving local content data into PostgreSQL with repeatable migrations.', $$A database migration should be boring to run and easy to inspect.
+
+Keep schema changes in versioned SQL, make seed data idempotent, and verify the result with psql before the application starts depending on it. A migration that works only on one laptop is not finished.
+
+The terminal is an excellent place to make database state visible.$$),
+    ('making-search-feel-natural', 'Searching Code with grep, rg, and git', 'A practical tour of fast text searches for a busy Linux repository.', $$Start broad with rg, narrow by file type, and include line numbers when the result will become a follow-up task.
+
+git grep is useful when you want the tracked view of a repository. grep -R remains available almost everywhere, which makes it a dependable fallback on minimal systems.
+
+The best search command shortens the distance between a question and the file that answers it.$$),
+    ('a-field-guide-to-content-reviews', 'A Field Guide to Shell Script Reviews', 'A compact checklist for reviewing Bash before it reaches production.', $$Check quoting, glob behavior, unset variables, exit codes, temporary files, permissions, and cleanup paths.
+
+Then read the script as a sequence of commands run by a new shell on a machine with a different environment. Reviewers should ask what happens when the network is unavailable, a file is missing, or a command returns no rows.
+
+The best review catches an unsafe assumption before it becomes an incident.$$),
+    ('reliability-behind-the-scenes', 'Reliability with systemd and journalctl', 'A practical pairing for running and diagnosing Linux services.', $$systemd describes how a service should run; journalctl shows what it actually did.
+
+Use systemctl status for a quick state check, systemctl cat to inspect the loaded unit, and journalctl -u service --since today to follow the evidence. Keep restart policies intentional and make health checks observable.
+
+Reliable services leave a useful trail when something goes wrong.$$),
+    ('the-anatomy-of-a-good-release-note', 'The Anatomy of a Good CLI Release', 'Release notes for developer tools should show the changed command and its effect.', $$A useful CLI release note includes the old behavior, the new command, and one realistic terminal example.
+
+Mention changed defaults, removed flags, migration steps, and compatibility concerns. Users should be able to decide whether to upgrade without searching through implementation details.
+
+Good release notes make a tool feel stable even as it evolves.$$),
+    ('working-with-feedback', 'Working with Terminal Feedback', 'How command output, bug reports, and shell history reveal what a tool should improve.', $$A failed command is feedback with context attached.
+
+Capture the exact command, environment, exit status, and the smallest useful piece of output. Repeated confusion around the same flag is often a documentation problem; repeated slow commands may be a design problem.
+
+Treat reports as clues about the workflow, not only as isolated defects.$$),
+    ('the-value-of-a-calm-admin-interface', 'The Value of a Calm Operations Console', 'A good operations screen should feel like a well-organized terminal session.', $$Operations work needs clear status, safe defaults, and an obvious path back from a mistake.
+
+Show what is running, what changed, and which command or action will happen next. Destructive operations should make scope visible before they ask for confirmation.
+
+The calmest interface is the one that helps a tired operator make the right decision.$$),
+    ('when-to-use-a-draft', 'When to Keep a Shell Note as a Draft', 'Some commands need a little more testing before they become part of the permanent runbook.', $$Keep a command note in draft while paths, permissions, and failure behavior are still uncertain.
+
+Run it from a clean directory, test the negative path, and write down the rollback before calling it ready. A draft is useful when it preserves the question as well as the current answer.$$),
+    ('our-approach-to-technical-debt', 'Our Approach to Shell and Build Debt', 'Technical debt in scripts and build files compounds quickly when nobody owns the cleanup.', $$A clever one-liner can become expensive when it is copied into five deployment scripts.
+
+Prefer named functions, stable interfaces, and explicit dependencies. In Go and Java projects, keep build commands discoverable through Make, Maven, or a documented task runner.
+
+Pay down debt when you are already working near the command that created it.$$),
+    ('a-better-way-to-plan-content', 'A Better Way to Plan a Linux Lab', 'Plan experiments around one command, one hypothesis, and one observable result.', $$A useful Linux lab has a question such as “what happens when this unit restarts?” and a small set of commands that can answer it.
+
+Write the expected result before running the experiment. Save the actual output, explain the difference, and turn the conclusion into a reusable note.
+
+Focused experiments produce better operational knowledge than a long list of disconnected commands.$$),
+    ('meet-the-editorial-team', 'Meet the Tools in the Terminal', 'The daily toolkit: Bash for glue, Go for services, Java for platforms, and Linux underneath.', $$Different tools earn their place by solving different problems.
+
+Bash connects existing commands. Go makes small services and utilities easy to ship. Java and Spring Boot support long-lived applications with strong conventions. Linux gives all of them a dependable home.
+
+The interesting work happens at the boundaries between those tools.$$),
+    ('what-we-learned-from-our-first-workshop', 'What We Learned from a Shell Workshop', 'A few exercises that helped developers become more confident at the command line.', $$The most useful workshop exercise was troubleshooting a broken service from symptoms alone.
+
+Participants used systemctl, journalctl, ss, curl, and grep to form a hypothesis, test it, and explain the fix. The lesson was less about memorizing commands and more about building a reliable investigation loop.
+
+Confidence grows when every command has a question behind it.$$),
+    ('a-small-experiment-in-onboarding', 'A Small Experiment with Bash Completion', 'We are testing whether better completion makes unfamiliar commands easier to discover.', $$Completion can turn a blank prompt into a gentle guide.
+
+The experiment adds examples for common flags, paths, and service names while keeping the underlying command unchanged. We will compare successful first attempts and the number of help-page lookups.
+
+Good completion should teach without getting in the way.$$),
+    ('questions-we-are-exploring', 'Questions We Are Exploring', 'Open questions about Linux workflows, build tools, and the boundary between scripts and software.', $$When should a Bash script become a Go command? When does a Maven plugin deserve a dedicated build step? Which operational knowledge belongs in a runbook and which belongs in automation?
+
+These questions are intentionally open. Experiments in the terminal will give us better answers than abstract rules.$$),
+    ('content-modeling-principles', 'Content Modeling for Runbooks', 'A runbook needs commands, assumptions, expected output, and recovery steps—not just a paragraph of advice.', $$A useful runbook entry describes the situation, the command to run, the expected evidence, and the safe recovery path.
+
+Keep environment-specific values visible, separate read-only checks from changes, and include links to the service or migration that the command supports.
+
+Structured operational notes are easier to search when the next incident arrives.$$),
+    ('why-plain-language-wins', 'Why Plain Language Wins in Man Pages', 'Clear command descriptions help people move from a prompt to a correct action.', $$A man page should tell readers what a command does before listing every option.
+
+Use examples that resemble real work, explain dangerous flags near the command that uses them, and avoid hiding the important behavior behind jargon.
+
+Plain language is a reliability feature for people working under pressure.$$),
+    ('a-note-on-data-retention', 'A Note on Logs and Data Retention', 'Keep logs long enough to investigate, but not so long that useful evidence disappears in noise.', $$Log retention is an operational decision.
+
+Choose a period that supports debugging and compliance, rotate files predictably, and make sure disk usage is observable. journalctl and logrotate are only useful when their limits are understood.
+
+The right amount of history is the amount that helps answer the next incident question.$$),
+    ('the-next-quarter', 'Looking Ahead from the Terminal', 'The next stretch of work focuses on sharper Linux workflows, dependable Go services, and practical Java notes.', $$The backlog ahead includes systemd troubleshooting, Bash patterns, Go HTTP services, Spring Boot operations, Maven build hygiene, and better PostgreSQL tooling.
+
+The goal is not to collect technologies. It is to understand the small commands and decisions that make them pleasant to use.$$),
+    ('community-notes-june', 'Community Notes from the Linux Shell', 'A collection of commands and habits shared by people who spend their days in terminals.', $$This month''s notes include using ssh config aliases, pairing find with xargs carefully, checking ports with ss, and using git worktree for parallel fixes.
+
+The common thread is respect for the next person at the prompt: make the command visible, explain the edge case, and leave the machine in a known state.$$),
+    ('release-0-3-preview', 'Release 0.3 Preview: More Terminal, Less Guessing', 'A preview of improvements for Linux-first development workflows.', $$The next release will add clearer command output, safer local migrations, better Go service diagnostics, and more useful notes for Java and Spring Boot projects.
+
+These changes are still being tested. The target is simple: fewer guesses between opening a terminal and understanding what the application is doing.$$)
+) AS seed(slug, title, summary, body) WHERE c.slug = seed.slug;
+
+UPDATE content SET category_id = categories.id
+FROM categories
+WHERE categories.slug = CASE
+    WHEN content.slug IN ('a-practical-guide-to-editorial-workflows', 'building-a-better-content-calendar', 'how-we-write-useful-documentation', 'accessibility-is-a-quality-practice', 'making-search-feel-natural', 'a-field-guide-to-content-reviews', 'when-to-use-a-draft', 'a-better-way-to-plan-content', 'why-plain-language-wins', 'welcome-to-the-cms') THEN 'bash'
+    WHEN content.slug IN ('the-case-for-small-releases', 'measuring-what-matters', 'reliability-behind-the-scenes', 'our-approach-to-technical-debt', 'meet-the-editorial-team', 'what-we-learned-from-our-first-workshop') THEN 'go'
+    WHEN content.slug IN ('a-small-experiment-in-onboarding', 'questions-we-are-exploring') THEN 'java'
+    WHEN content.slug IN ('notes-from-a-content-migration', 'the-anatomy-of-a-good-release-note', 'working-with-feedback', 'the-value-of-a-calm-admin-interface', 'content-modeling-principles', 'a-note-on-data-retention', 'the-next-quarter', 'community-notes-june', 'release-0-3-preview') THEN 'devops'
+    ELSE 'linux'
+END;
+
+DELETE FROM content_badges;
+INSERT INTO content_badges (content_id, badge_id)
+SELECT c.id, b.id
+FROM (VALUES
+    ('welcome-to-the-cms', 'linux'), ('welcome-to-the-cms', 'terminal'), ('welcome-to-the-cms', 'bash'),
+    ('designing-for-clarity', 'terminal'), ('designing-for-clarity', 'shell'),
+    ('a-practical-guide-to-editorial-workflows', 'bash'), ('a-practical-guide-to-editorial-workflows', 'shell'),
+    ('building-a-better-content-calendar', 'linux'), ('building-a-better-content-calendar', 'grep'),
+    ('the-case-for-small-releases', 'go'), ('the-case-for-small-releases', 'git'),
+    ('how-we-write-useful-documentation', 'bash'), ('how-we-write-useful-documentation', 'terminal'),
+    ('accessibility-is-a-quality-practice', 'linux'), ('accessibility-is-a-quality-practice', 'shell'),
+    ('measuring-what-matters', 'linux'), ('measuring-what-matters', 'systemd'),
+    ('notes-from-a-content-migration', 'postgresql'), ('notes-from-a-content-migration', 'docker'),
+    ('making-search-feel-natural', 'grep'), ('making-search-feel-natural', 'awk'),
+    ('a-field-guide-to-content-reviews', 'bash'), ('a-field-guide-to-content-reviews', 'shell'),
+    ('reliability-behind-the-scenes', 'systemd'), ('reliability-behind-the-scenes', 'linux'),
+    ('the-anatomy-of-a-good-release-note', 'go'), ('the-anatomy-of-a-good-release-note', 'git'),
+    ('working-with-feedback', 'terminal'), ('working-with-feedback', 'ssh'),
+    ('the-value-of-a-calm-admin-interface', 'devops'), ('the-value-of-a-calm-admin-interface', 'linux'),
+    ('when-to-use-a-draft', 'bash'), ('when-to-use-a-draft', 'git'),
+    ('our-approach-to-technical-debt', 'go'), ('our-approach-to-technical-debt', 'java'),
+    ('a-better-way-to-plan-content', 'linux'), ('a-better-way-to-plan-content', 'terminal'),
+    ('meet-the-editorial-team', 'bash'), ('meet-the-editorial-team', 'go'), ('meet-the-editorial-team', 'java'),
+    ('what-we-learned-from-our-first-workshop', 'systemd'), ('what-we-learned-from-our-first-workshop', 'journalctl'),
+    ('a-small-experiment-in-onboarding', 'bash'), ('a-small-experiment-in-onboarding', 'terminal'),
+    ('questions-we-are-exploring', 'go'), ('questions-we-are-exploring', 'spring-boot'), ('questions-we-are-exploring', 'maven'),
+    ('content-modeling-principles', 'devops'), ('content-modeling-principles', 'postgresql'),
+    ('why-plain-language-wins', 'linux'), ('why-plain-language-wins', 'terminal'),
+    ('a-note-on-data-retention', 'systemd'), ('a-note-on-data-retention', 'devops'),
+    ('the-next-quarter', 'linux'), ('the-next-quarter', 'go'), ('the-next-quarter', 'java'),
+    ('community-notes-june', 'ssh'), ('community-notes-june', 'git'), ('community-notes-june', 'shell'),
+    ('release-0-3-preview', 'go'), ('release-0-3-preview', 'spring-boot'), ('release-0-3-preview', 'maven')
+) AS seed(slug, badge)
+JOIN content c ON c.slug = seed.slug
+JOIN badges b ON b.name = seed.badge;

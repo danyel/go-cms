@@ -5,8 +5,13 @@ import { useAuth } from './auth'
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth()
+  const [dark, setDark] = useState(() => window.localStorage.getItem('urpi-theme') !== 'light')
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+    window.localStorage.setItem('urpi-theme', dark ? 'dark' : 'light')
+  }, [dark])
   return <main className="shell">
-    <header className="header"><Link className="brand" to="/"><span className="brand-prompt">~/</span> Urpi's backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>{user && <button className="text-button" onClick={() => void signOut()}>Sign out</button>}</header>
+    <header className="header"><Link className="brand" to="/"><span className="brand-prompt">~/</span> Urpi's backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link><div className="header-actions"><button className="theme-button" type="button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`} onClick={() => setDark(value => !value)}>{dark ? '☀ Light' : '☾ Dark'}</button>{user && <button className="text-button" onClick={() => void signOut()}>Sign out</button>}</div></header>
     {children}
   </main>
 }
@@ -98,7 +103,7 @@ function ContentList() {
   }, [cursor, category, status, badges.join(',')])
 
   return <Shell><section className="content-page">
-    <div className="page-heading"><div><span className="eyebrow">Journal</span><h1>Latest content</h1></div></div>
+    <div className="page-heading"><div><span className="eyebrow">$ cd ~/backlog && ls</span></div></div>
     <div className="filters" aria-label="Content filters">
       <label className="status-filter">Status
         <select value={status} onChange={event => setStatus(event.target.value)}>
