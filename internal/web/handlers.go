@@ -38,6 +38,7 @@ func (h *Handler) Routes(origins string) http.Handler {
 	mux.HandleFunc("/api/protected", h.protected)
 	mux.HandleFunc("/api/content", h.contentList)
 	mux.HandleFunc("/api/content/categories", h.contentCategories)
+	mux.HandleFunc("/api/content/badges", h.contentBadges)
 	mux.HandleFunc("/api/content/", h.contentDetail)
 	return cors(mux, origins)
 }
@@ -208,6 +209,26 @@ func (h *Handler) contentCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonWrite(w, 200, map[string]any{"items": categories})
+}
+func (h *Handler) contentBadges(w http.ResponseWriter, r *http.Request) {
+	if h.content == nil {
+		jsonWrite(w, 503, map[string]string{"error": "content unavailable"})
+		return
+	}
+	if _, ok := h.sessionForRequest(r); !ok {
+		jsonWrite(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		jsonWrite(w, http.StatusMethodNotAllowed, nil)
+		return
+	}
+	badges, err := h.content.ListBadges(r.Context())
+	if err != nil {
+		jsonWrite(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonWrite(w, 200, map[string]any{"items": badges})
 }
 func (h *Handler) contentDetail(w http.ResponseWriter, r *http.Request) {
 	if h.content == nil {

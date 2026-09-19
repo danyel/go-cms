@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { getContent, listCategories, listContent, updateContent, type Category, type Content, type ContentUpdate } from './api'
+import { getContent, listBadges, listCategories, listContent, updateContent, type Badge, type Category, type Content, type ContentUpdate } from './api'
 import { useAuth } from './auth'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -47,6 +47,7 @@ function ContentList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [badgeOptions, setBadgeOptions] = useState<Badge[]>([])
   const [category, setCategory] = useState('')
   const [badges, setBadges] = useState<string[]>([])
   const [badgeInput, setBadgeInput] = useState('')
@@ -75,7 +76,11 @@ function ContentList() {
       }
     }
   }
-  useEffect(() => { void listCategories().then(setCategories).catch(() => setCategories([])) }, [])
+  useEffect(() => {
+    void Promise.all([listCategories(), listBadges()])
+      .then(([nextCategories, nextBadges]) => { setCategories(nextCategories); setBadgeOptions(nextBadges) })
+      .catch(() => { setCategories([]); setBadgeOptions([]) })
+  }, [])
   useEffect(() => {
     loadingMore.current = false
     setItems([])
@@ -102,13 +107,14 @@ function ContentList() {
       <label className="badge-filter">Badges
         <div className="badge-input">
           {badges.map(badge => <span className="filter-pill" key={badge}>{badge}<button type="button" aria-label={`Remove ${badge}`} onClick={() => setBadges(current => current.filter(value => value !== badge))}>×</button></span>)}
-          <input value={badgeInput} placeholder="Type a badge and press Enter" onChange={event => setBadgeInput(event.target.value)} onKeyDown={event => {
+          <input list="badge-options" value={badgeInput} placeholder="Type a badge and press Enter" onChange={event => setBadgeInput(event.target.value)} onKeyDown={event => {
             if (event.key !== 'Enter') return
             event.preventDefault()
             const badge = badgeInput.trim().toLowerCase()
             if (badge && !badges.includes(badge)) setBadges(current => [...current, badge])
             setBadgeInput('')
           }} />
+          <datalist id="badge-options">{badgeOptions.filter(item => !badges.includes(item.name)).map(item => <option value={item.name} key={item.id}>{item.name}</option>)}</datalist>
         </div>
       </label>
     </div>

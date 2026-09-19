@@ -115,10 +115,16 @@ export async function listContent(cursor?: string | null, category = '', badges:
 }
 
 export type Category = { id: string; slug: string; name: string }
+export type Badge = { id: string; name: string }
 
 export async function listCategories(): Promise<Category[]> {
   const response = await contentRequest<{ items?: Array<Category & { ID?: string; Slug?: string; Name?: string }> }>('/categories')
   return (response.items ?? []).map(item => ({ id: item.id ?? item.ID ?? '', slug: item.slug ?? item.Slug ?? '', name: item.name ?? item.Name ?? '' }))
+}
+
+export async function listBadges(): Promise<Badge[]> {
+  const response = await contentRequest<{ items?: Array<Badge & { ID?: string; Name?: string }> }>('/badges')
+  return (response.items ?? []).map(item => ({ id: item.id ?? item.ID ?? '', name: item.name ?? item.Name ?? '' }))
 }
 
 export function getContent(id: string): Promise<Content> {

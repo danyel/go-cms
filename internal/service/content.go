@@ -14,6 +14,7 @@ import (
 type IContentService interface {
 	List(context.Context, int, int, string, []string) ([]domain.Content, error)
 	ListCategories(context.Context) ([]domain.Category, error)
+	ListBadges(context.Context) ([]domain.Badge, error)
 	Get(context.Context, string) (domain.Content, error)
 	Update(context.Context, domain.Content, domain.Session) (domain.Content, error)
 }
@@ -39,6 +40,9 @@ func (s *ContentService) List(ctx context.Context, limit, offset int, category s
 }
 func (s *ContentService) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	return s.repo.ListCategories(ctx)
+}
+func (s *ContentService) ListBadges(ctx context.Context) ([]domain.Badge, error) {
+	return s.repo.ListBadges(ctx)
 }
 func (s *ContentService) Get(ctx context.Context, slug string) (domain.Content, error) {
 	if !validSlug(slug) {

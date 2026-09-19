@@ -90,6 +90,17 @@ func (r *GORMContentRepository) ListCategories(ctx context.Context) ([]domain.Ca
 	}
 	return out, nil
 }
+func (r *GORMContentRepository) ListBadges(ctx context.Context) ([]domain.Badge, error) {
+	var rows []persistence.BadgeModel
+	if err := r.db.WithContext(ctx).Order("name ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.Badge, len(rows))
+	for i := range rows {
+		out[i] = domain.Badge{ID: rows[i].ID, Name: rows[i].Name}
+	}
+	return out, nil
+}
 func (r *GORMContentRepository) FindBySlug(ctx context.Context, slug string) (domain.Content, error) {
 	var row persistence.ContentModel
 	if err := r.db.WithContext(ctx).Preload("Category").Preload("Badges").Where("slug = ?", slug).First(&row).Error; err != nil {

@@ -41,6 +41,11 @@ type Category struct {
 	Name string
 }
 
+type Badge struct {
+	ID   uint
+	Name string
+}
+
 type ContentHistory struct {
 	ID           uint
 	ContentID    uint
