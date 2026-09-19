@@ -1,18 +1,6 @@
-export type User = {
-  id?: string
-  name?: string
-  email?: string
-  picture?: string
-  capabilities?: Record<string, boolean>
-}
-
-// The backend never signs users in: an upstream SSO proxy asserts the owner's
-// identity. The session endpoint only reports whether that identity is present.
-export type SessionResponse = {
-  authenticated?: boolean
-  canEdit?: boolean
-  username?: string
-}
+import {type Badge, type Category, type Content, type ContentListResponse, type ContentUpdate} from './models'
+import {type DemoUser, type SessionResponse} from './models'
+export type {Badge, Category, Content, ContentListResponse, ContentUpdate, DemoUser, SessionResponse}
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 export const apiConfig = {
@@ -20,8 +8,6 @@ export const apiConfig = {
   content: import.meta.env.VITE_CONTENT_ENDPOINT ?? '/api/content',
   signIn: import.meta.env.VITE_SSO_LOGIN_URL ?? '',
 }
-
-export type DemoUser = { username: string; name: string }
 
 export async function listDemoUsers(): Promise<DemoUser[]> {
   const response = await fetch(apiUrl('/api/auth/users'), {headers: {Accept: 'application/json'}})
@@ -70,31 +56,6 @@ export async function requestSession(): Promise<SessionResponse | null> {
 function demoAuthHeaders(): Record<string, string> {
   const token = window.sessionStorage.getItem('cms-demo-token')
   return token ? {Authorization: `Bearer ${token}`} : {}
-}
-
-export type Content = {
-  id: string
-  title: string
-  summary: string
-  body: string
-  status: string
-  category?: string
-  badges?: string[]
-  createdAt?: string
-  updatedAt?: string
-  author?: string
-  publishedAt?: string
-}
-
-export type ContentListResponse = {
-  items?: Content[]
-  content?: Content[]
-  data?: Content[]
-  nextCursor?: string | null
-  cursor?: string | null
-  hasMore?: boolean
-  offset?: number
-  limit?: number
 }
 
 // Raw JSON as sent by the Go API: lowercase keys, with the slug doubling as the
@@ -159,9 +120,6 @@ export async function listContent(cursor?: string | null, category = '', status 
   return { ...response, items, nextCursor: items.length >= limit ? String(offset + items.length) : null }
 }
 
-export type Category = { id: string; slug: string; name: string }
-export type Badge = { id: string; name: string }
-
 export async function listCategories(): Promise<Category[]> {
   const response = await contentRequest<{ items?: Array<{ id?: string | number; slug?: string; Slug?: string; name?: string; Name?: string }> }>('/categories')
   return (response.items ?? []).map(item => ({ id: String(item.slug ?? item.slug ?? item.id ?? ''), slug: item.slug ?? item.Slug ?? '', name: item.name ?? item.Name ?? '' }))
@@ -175,8 +133,6 @@ export async function listBadges(): Promise<Badge[]> {
 export function getContent(id: string): Promise<Content> {
   return contentRequest<RawContent>(`/${encodeURIComponent(id)}`).then(normalizeContent)
 }
-
-export type ContentUpdate = Pick<Content, 'title' | 'summary' | 'body' | 'status' | 'badges'>
 
 export function updateContent(id: string, content: ContentUpdate): Promise<Content> {
   return contentRequest<RawContent>(`/${encodeURIComponent(id)}`, {

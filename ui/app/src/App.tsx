@@ -1,97 +1,19 @@
 import {useEffect, useRef, useState} from 'react'
 import {Link, Navigate, Route, Routes, useParams} from 'react-router-dom'
 import {
-    type Badge,
-    type Category,
     type Content,
     type ContentUpdate,
     getContent,
-    listDemoUsers,
     listBadges,
     listCategories,
     listContent,
     updateContent
 } from './api'
 import {useAuth} from './auth'
-
-function Shell({children}: { children: React.ReactNode }) {
-    const {authenticated, loading, canSignIn, signIn, username, sudo, signOut} = useAuth()
-    const [sudoOpen, setSudoOpen] = useState(false)
-    const [helpOpen, setHelpOpen] = useState(false)
-    const [users, setUsers] = useState<{username: string; name: string}[]>([])
-    const [user, setUser] = useState('')
-    const [password, setPassword] = useState('')
-    const [sudoError, setSudoError] = useState('')
-    useEffect(() => { void listDemoUsers().then(setUsers) }, [])
-    const [dark, setDark] = useState(() => window.localStorage.getItem('urpi-theme') !== 'light')
-    useEffect(() => {
-        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-        window.localStorage.setItem('urpi-theme', dark ? 'dark' : 'light')
-    }, [dark])
-    return <main className="shell">
-        <header className="header"><Link className="brand" to="/content"><span className="brand-prompt">~/</span> Urpi's
-            backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>
-            <div className="header-actions">{!loading &&
-                <span className="mode-badge">{authenticated ? `${username ?? 'Owner'} · sudo` : 'Anonymous · read-only'}</span>}
-                <button className="theme-button" type="button" aria-label="Demo users" onClick={() => setHelpOpen(value => !value)}>?</button>
-                {!loading && !authenticated && users.length > 0 &&
-                    <button className="theme-button" type="button" onClick={() => setSudoOpen(true)}>sudo</button>}
-                {!loading && authenticated && users.length > 0 &&
-                    <button className="theme-button" type="button" onClick={signOut}>logout</button>}
-                {!loading && !authenticated && canSignIn &&
-                    <button className="google-button session-button" type="button" onClick={signIn}><span
-                        aria-hidden="true">G</span> Sign in with Google</button>}
-                <button className="theme-button" type="button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`}
-                        onClick={() => setDark(value => !value)}>{dark ? '☀ Light' : '☾ Dark'}</button>
-            </div>
-        </header>
-        {helpOpen && users.length > 0 && <aside className="card terminal-panel">
-            <strong>sudo users</strong><p className="muted">Demo only: each password is the same as the username.</p>
-            {users.map(item => <div key={item.username}><code>sudo {item.username}</code> · {item.name}</div>)}
-        </aside>}
-        {sudoOpen && <div className="terminal-backdrop" role="presentation" onMouseDown={event => {
-            if (event.target === event.currentTarget) setSudoOpen(false)
-        }}>
-            <form className="terminal-window" role="dialog" aria-modal="true" aria-labelledby="sudo-title" onSubmit={event => {
-                event.preventDefault()
-                setSudoError('')
-                void sudo(user, password).then(() => { setSudoOpen(false); setPassword('') }).catch(error => setSudoError(error instanceof Error ? error.message : 'sudo failed'))
-            }}>
-                <div className="terminal-titlebar">
-                    <span id="sudo-title">urpi@backlog: ~</span>
-                    <button type="button" className="terminal-close" aria-label="Close sudo terminal"
-                            onClick={() => setSudoOpen(false)}>×</button>
-                </div>
-                <div className="terminal-body">
-                    <p><span className="terminal-prompt">$</span> sudo login</p>
-                    <label><span className="terminal-prompt">$</span> sudo <input autoFocus value={user}
-                        onChange={event => setUser(event.target.value)} placeholder="user" aria-label="Username"/></label>
-                    <label><span className="terminal-prompt">$</span> password: <input type="password" value={password}
-                        onChange={event => setPassword(event.target.value)} aria-label="Password"/></label>
-                    {sudoError && <p className="terminal-error">{sudoError}</p>}
-                    <button className="terminal-submit" type="submit"><span className="terminal-prompt">$</span> Enter</button>
-                </div>
-            </form>
-        </div>}
-        {children}
-    </main>
-}
-
-function ContentCard({item}: { item: Content }) {
-    return <article className="content-card">
-        <span className="status">{item.status}</span>
-        <h2><Link to={`/content/${item.id}`}>{item.title}</Link></h2>
-        <p>{item.summary}</p>
-        <p className="content-meta">
-            by {item.author ?? 'unknown'}
-            {item.publishedAt && <> · published {new Date(item.publishedAt).toLocaleDateString()}</>}
-        </p>
-        {item.badges && item.badges.length > 0 &&
-            <div className="badge-list">{item.badges.map(badge => <span className="badge"
-                                                                        key={badge}>{badge}</span>)}</div>}
-        <Link className="read-link" to={`/content/${item.id}`}>Read more <span aria-hidden="true">→</span></Link>
-    </article>
-}
+import {ContentCard} from './components/ContentCard'
+import {ContentFilters} from './components/ContentFilters'
+import {Shell} from './components/Shell'
+import {type Badge, type Category} from './models'
 
 function ContentList() {
     const [items, setItems] = useState<Content[]>([])
@@ -161,41 +83,9 @@ function ContentList() {
             <div className="page-heading">
                 <div><span className="eyebrow">$ cd ~/backlog && ls</span></div>
             </div>
-            <div className="filters" aria-label="Content filters">
-                <label className="status-filter">Status
-                    <select value={status} onChange={event => setStatus(event.target.value)}>
-                        <option value="">All statuses</option>
-                        <option value="published">Published</option>
-                        <option value="draft">Draft</option>
-                        <option value="review">Review</option>
-                        <option value="archived">Archived</option>
-                    </select>
-                </label>
-                <label className="category-filter">Category
-                    <select value={category} onChange={event => setCategory(event.target.value)}>
-                        <option value="">All categories</option>
-                        {categories.map(item => <option value={item.slug} key={item.slug}>{item.name}</option>)}
-                    </select>
-                </label>
-                <label className="badge-filter">Badges
-                    <div className="badge-input">
-                        {badges.map(badge => <span className="filter-pill" key={badge}>{badge}
-                            <button type="button" aria-label={`Remove ${badge}`}
-                                    onClick={() => setBadges(current => current.filter(value => value !== badge))}>×</button></span>)}
-                        <input list="badge-options" value={badgeInput} placeholder="Type a badge and press Enter"
-                               onChange={event => setBadgeInput(event.target.value)} onKeyDown={event => {
-                            if (event.key !== 'Enter') return
-                            event.preventDefault()
-                            const badge = badgeInput.trim().toLowerCase()
-                            if (badge && !badges.includes(badge)) setBadges(current => [...current, badge])
-                            setBadgeInput('')
-                        }}/>
-                        <datalist
-                            id="badge-options">{badgeOptions.filter(item => !badges.includes(item.name)).map(item =>
-                            <option value={item.name} key={item.id}>{item.name}</option>)}</datalist>
-                    </div>
-                </label>
-            </div>
+            <ContentFilters categories={categories} badgeOptions={badgeOptions} category={category} status={status}
+                badges={badges} badgeInput={badgeInput} onCategoryChange={setCategory} onStatusChange={setStatus}
+                onBadgesChange={setBadges} onBadgeInputChange={setBadgeInput}/>
             {error && <p className="error" role="alert">{error}</p>}
             {!loading && !error && items.length === 0 &&
                 <div className="card empty-state"><h2>No content yet</h2><p className="muted">There is nothing published
