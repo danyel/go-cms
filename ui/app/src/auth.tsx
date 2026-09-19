@@ -11,10 +11,12 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
 
-function getUser(result: { authenticated?: boolean; user?: User; token?: string; accessToken?: string; sessionToken?: string }) {
+function getUser(result: { authenticated?: boolean; user?: User; capabilities?: Record<string, boolean>; canEdit?: boolean; token?: string; accessToken?: string; sessionToken?: string }) {
   const token = result.token ?? result.accessToken ?? result.sessionToken
   if (token) sessionStorage.setItem('cms.auth.token', token)
-  return result.authenticated === false ? null : result.user ?? (token ? {} : null)
+  if (result.authenticated === false) return null
+  if (!result.user && !token && result.authenticated !== true) return null
+  return { ...(result.user ?? {}), capabilities: { ...result.capabilities, ...(result.canEdit !== undefined ? { canEdit: result.canEdit } : {}), ...result.user?.capabilities } }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

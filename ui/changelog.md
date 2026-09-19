@@ -30,3 +30,31 @@ React. Keep this changelog in `ui/changelog.md`.
 - Added environment examples, ignore rules, README documentation, and backend
   unit tests.
 - Verified Go tests and prepared frontend typecheck/build scripts.
+
+## 2026-09-19 — Content and authorization
+
+### Prompt
+
+Fix the missing protected page and add a blog-like content experience with
+infinite scrolling summaries, detail links, capability-controlled editing and
+saving. Persist logged-in users so authorities can be assigned. Add a content
+data model with creation/edit audit information and a history table recording
+changes. Implement the domain model, mappers, web handlers, services,
+repositories, migrations, and pages.
+
+### Tasks completed
+
+- Added persisted user role/editor authorization fields and generic `canEdit`
+  capability evaluation; administrators can edit through the same capability.
+- Added content and content-history domain models, GORM models, explicit
+  mappers, repositories, services, and a Goose PostgreSQL migration.
+- Added authenticated content listing/detail/update endpoints with pagination,
+  validation, 401/403 handling, audit fields, and transactional history
+  snapshots.
+- Added `/protected` and `/api/protected`; retained `/test` and
+  `/api/test/protected` compatibility routes.
+- Added the authenticated infinite-scroll content page, detail page, and
+  capability-gated edit/save mode.
+- Exposed the authenticated user and generic capabilities in the session
+  response; no admin link was added to user-facing navigation.
+- Revalidated with `go test ./...`, `npm run typecheck`, and `npm run build`.

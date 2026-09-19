@@ -80,9 +80,10 @@ func main() {
 		repository.NewSessionRepository(adminDB),
 		cfg.SessionTTL,
 	)
+	content := service.NewContentService(repository.NewContentRepository(applicationDB), auth)
 	google := identity.GoogleProvider{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret, RedirectURL: cfg.GoogleRedirectURL}
 	log.Printf("CMS listening on %s", cfg.HTTPAddr)
-	if err = http.ListenAndServe(cfg.HTTPAddr, web.NewHandler(auth, google).Routes(cfg.AllowedOrigins)); err != nil {
+	if err = http.ListenAndServe(cfg.HTTPAddr, web.NewHandlerWithContent(auth, google, content).Routes(cfg.AllowedOrigins)); err != nil {
 		log.Fatal(err)
 	}
 }

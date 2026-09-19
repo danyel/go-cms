@@ -72,6 +72,22 @@ func (s *AuthService) AdminLogin(ctx context.Context, email string) (domain.Admi
 func (s *AuthService) AdminAuthenticate(ctx context.Context, t string) (domain.Session, error) {
 	return s.adminSessions.FindValid(ctx, t)
 }
+func (s *AuthService) UserByID(ctx context.Context, id uint) (domain.User, error) {
+	if lookup, ok := s.users.(repository.IUserLookup); ok {
+		return lookup.FindByID(ctx, id)
+	}
+	return domain.User{}, errors.New("user lookup unavailable")
+}
+func (s *AuthService) CanEdit(ctx context.Context, session domain.Session) bool {
+	if session.AdminID != nil {
+		return true
+	}
+	if session.UserID == nil {
+		return false
+	}
+	u, err := s.UserByID(ctx, *session.UserID)
+	return err == nil && (u.Editor || u.Role == "editor" || u.Role == "admin")
+}
 func newToken() (string, error) {
 	b := make([]byte, 32)
 	if _, e := rand.Read(b); e != nil {

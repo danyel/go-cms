@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"github.com/example/cms/internal/domain"
 	"github.com/example/cms/internal/identity"
 	"github.com/example/cms/internal/service"
 	"github.com/example/cms/internal/web/mapping"
@@ -13,12 +15,16 @@ import (
 )
 
 type Handler struct {
-	auth   *service.AuthService
-	google identity.GoogleProvider
+	auth    *service.AuthService
+	google  identity.GoogleProvider
+	content service.IContentService
 }
 
 func NewHandler(a *service.AuthService, google identity.GoogleProvider) *Handler {
 	return &Handler{auth: a, google: google}
+}
+func NewHandlerWithContent(a *service.AuthService, google identity.GoogleProvider, content service.IContentService) *Handler {
+	return &Handler{auth: a, google: google, content: content}
 }
 func (h *Handler) Routes(origins string) http.Handler {
 	mux := http.NewServeMux()
@@ -29,6 +35,9 @@ func (h *Handler) Routes(origins string) http.Handler {
 	mux.HandleFunc("/api/auth/session", h.session)
 	mux.HandleFunc("/admin/login", h.adminLogin)
 	mux.HandleFunc("/api/test/protected", h.protected)
+	mux.HandleFunc("/api/protected", h.protected)
+	mux.HandleFunc("/api/content", h.contentList)
+	mux.HandleFunc("/api/content/", h.contentDetail)
 	return cors(mux, origins)
 }
 func (h *Handler) googleLogin(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +86,12 @@ func (h *Handler) session(w http.ResponseWriter, r *http.Request) {
 		jsonWrite(w, http.StatusUnauthorized, map[string]string{"authenticated": "false"})
 		return
 	}
-	jsonWrite(w, http.StatusOK, map[string]bool{"authenticated": true})
+	u, err := h.auth.UserByID(r.Context(), *s.UserID)
+	if err != nil {
+		jsonWrite(w, http.StatusUnauthorized, map[string]string{"authenticated": "false"})
+		return
+	}
+	jsonWrite(w, http.StatusOK, map[string]any{"authenticated": true, "user": u, "canEdit": h.auth.CanEdit(r.Context(), s)})
 }
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -128,6 +142,87 @@ func (h *Handler) protected(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonWrite(w, 200, map[string]string{"status": "authenticated"})
 }
+func (h *Handler) sessionForRequest(r *http.Request) (domain.Session, bool) {
+	t := bearerOrCookie(r)
+	if t == "" {
+		return domain.Session{}, false
+	}
+	if s, e := h.auth.Authenticate(r.Context(), t); e == nil {
+		return s, true
+	}
+	if s, e := h.auth.AdminAuthenticate(r.Context(), t); e == nil {
+		return s, true
+	}
+	return domain.Session{}, false
+}
+func (h *Handler) contentList(w http.ResponseWriter, r *http.Request) {
+	if h.content == nil {
+		jsonWrite(w, 503, map[string]string{"error": "content unavailable"})
+		return
+	}
+	if _, ok := h.sessionForRequest(r); !ok {
+		jsonWrite(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if r.Method != "GET" {
+		jsonWrite(w, http.StatusMethodNotAllowed, nil)
+		return
+	}
+	limit, offset := 20, 0
+	_, _ = fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
+	_, _ = fmt.Sscanf(r.URL.Query().Get("offset"), "%d", &offset)
+	items, e := h.content.List(r.Context(), limit, offset)
+	if e != nil {
+		jsonWrite(w, 500, map[string]string{"error": e.Error()})
+		return
+	}
+	jsonWrite(w, 200, map[string]any{"items": items, "limit": limit, "offset": offset})
+}
+func (h *Handler) contentDetail(w http.ResponseWriter, r *http.Request) {
+	if h.content == nil {
+		jsonWrite(w, 503, map[string]string{"error": "content unavailable"})
+		return
+	}
+	slug := strings.TrimPrefix(r.URL.Path, "/api/content/")
+	if r.Method == "GET" {
+		if _, ok := h.sessionForRequest(r); !ok {
+			jsonWrite(w, 401, map[string]string{"error": "authentication required"})
+			return
+		}
+		c, e := h.content.Get(r.Context(), slug)
+		if e != nil {
+			jsonWrite(w, 404, map[string]string{"error": "content not found"})
+			return
+		}
+		jsonWrite(w, 200, c)
+		return
+	}
+	if r.Method != "PUT" {
+		jsonWrite(w, 405, nil)
+		return
+	}
+	s, ok := h.sessionForRequest(r)
+	if !ok {
+		jsonWrite(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if !h.auth.CanEdit(r.Context(), s) {
+		jsonWrite(w, 403, map[string]string{"error": "forbidden"})
+		return
+	}
+	var c domain.Content
+	if !decode(r, &c) {
+		jsonWrite(w, 400, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	c.Slug = slug
+	out, e := h.content.Update(r.Context(), c, s)
+	if e != nil {
+		jsonWrite(w, 400, map[string]string{"error": e.Error()})
+		return
+	}
+	jsonWrite(w, 200, out)
+}
 func bearerOrCookie(r *http.Request) string {
 	header := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if header != "" {
@@ -155,7 +250,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(204)
 			return
