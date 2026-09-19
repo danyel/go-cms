@@ -23,6 +23,8 @@ Configure the header with `CMS_SSO_HEADER` (default `X-SSO-Token`). Set `CMS_SSO
 
 Because the backend trusts the forwarded header, it must only be reachable through the proxy. Bind it to the loopback interface or a private network, and make sure the proxy strips any client-supplied copy of that header.
 
+Anonymous visitors get a **Sign in with Google** button in the header. It redirects the browser to `VITE_SSO_LOGIN_URL` (frontend setting), where the provider authenticates the owner and returns to the page; the CMS itself never performs an OAuth exchange and holds no client secret. Leave the setting empty to hide the button when the proxy gates the whole app automatically.
+
 ## Content
 
 Content supports one reusable category per document plus any number of badges. The anonymous `GET /api/content` endpoint accepts `category=engineering` and repeated `badge=go&badge=docker` filters; selected badges are combined with AND semantics. `GET /api/content/categories` returns the category dropdown values. The frontend applies these filters immediately when the category changes or when a badge is entered.

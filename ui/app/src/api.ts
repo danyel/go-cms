@@ -17,11 +17,23 @@ const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 export const apiConfig = {
   session: import.meta.env.VITE_SESSION_ENDPOINT ?? '/api/auth/session',
   content: import.meta.env.VITE_CONTENT_ENDPOINT ?? '/api/content',
+  signIn: import.meta.env.VITE_SSO_LOGIN_URL ?? '',
 }
 
 export function apiUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path
   return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+// Send the browser to the configured Google/IdP sign-in URL. The identity
+// provider authenticates the owner and sends them back here; the app never
+// performs the OAuth exchange itself, so no client secret is needed. The
+// current page is passed as `rd` for proxies (oauth2-proxy) that honour it and
+// ignored by the ones that do not.
+export function signInWithGoogle(target = apiConfig.signIn): void {
+  if (!target) return
+  const returnTo = apiUrl(`${window.location.pathname}${window.location.search}`)
+  window.location.assign(`${target}${target.includes('?') ? '&' : '?'}rd=${encodeURIComponent(returnTo)}`)
 }
 
 export async function requestSession(): Promise<SessionResponse | null> {

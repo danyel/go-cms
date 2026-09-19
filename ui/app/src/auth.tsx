@@ -1,14 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { requestSession } from './api'
+import { apiConfig, requestSession, signInWithGoogle } from './api'
 
 // There is no sign-in or sign-out: the upstream SSO proxy decides whether the
-// current request carries the owner's identity.
+// current request carries the owner's identity. Signing in just sends the
+// browser to the configured Google/IdP URL.
 type AuthState = {
   loading: boolean
   authenticated: boolean
   canEdit: boolean
   error: string | null
   refresh: () => Promise<void>
+  canSignIn: boolean
+  signIn: () => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -36,7 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void refresh() }, [refresh])
 
-  const value = useMemo(() => ({ loading, authenticated, canEdit, error, refresh }), [loading, authenticated, canEdit, error, refresh])
+  const signIn = useCallback(() => { signInWithGoogle() }, [])
+  const canSignIn = apiConfig.signIn !== ''
+
+  const value = useMemo(
+    () => ({ loading, authenticated, canEdit, error, refresh, canSignIn, signIn }),
+    [loading, authenticated, canEdit, error, refresh, canSignIn, signIn],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

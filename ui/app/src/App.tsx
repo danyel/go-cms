@@ -14,7 +14,7 @@ import {
 import {useAuth} from './auth'
 
 function Shell({children}: { children: React.ReactNode }) {
-    const {authenticated, loading} = useAuth()
+    const {authenticated, loading, canSignIn, signIn} = useAuth()
     const [dark, setDark] = useState(() => window.localStorage.getItem('urpi-theme') !== 'light')
     useEffect(() => {
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
@@ -25,6 +25,9 @@ function Shell({children}: { children: React.ReactNode }) {
             backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>
             <div className="header-actions">{!loading &&
                 <span className="mode-badge">{authenticated ? 'Owner · SSO' : 'Anonymous · read-only'}</span>}
+                {!loading && !authenticated && canSignIn &&
+                    <button className="google-button session-button" type="button" onClick={signIn}><span
+                        aria-hidden="true">G</span> Sign in with Google</button>}
                 <button className="theme-button" type="button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`}
                         onClick={() => setDark(value => !value)}>{dark ? '☀ Light' : '☾ Dark'}</button>
             </div>

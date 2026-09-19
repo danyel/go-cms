@@ -83,3 +83,18 @@ application. Remove sign-in entirely, along with the admin database and the setu
   SSO/anonymous mode badge in the header, and an Edit button gated on `canEdit`.
 - Added backend tests for anonymous read-only access and proxy-authenticated editing.
 - Revalidated with `gofmt`, `go build ./...`, `go test ./...`, `npm run typecheck`, and `npm run build`.
+
+## 2026-09-19 — Google sign-in button
+
+### Prompt
+
+Add a button that redirects to a Google single sign-on.
+
+### Tasks completed
+
+- Added a **Sign in with Google** button to the header, shown only while the visitor is anonymous.
+- It redirects to `VITE_SSO_LOGIN_URL` with the current page as `rd`, so oauth2-proxy-style
+  endpoints return the owner to where they were; an empty value hides the button entirely.
+- Kept the SSO model intact: the button only navigates to the identity provider, the CMS still
+  holds no client secret and creates no session — the proxy asserts the identity header.
+- Documented the new setting in `ui/app/.env.example`, `ui/app/README.md`, and the root README.
