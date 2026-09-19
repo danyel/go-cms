@@ -2,8 +2,9 @@ SHELL := /bin/sh
 
 IMAGE ?= cms-demo
 TAG ?= latest
+REGISTRY_IMAGE ?= batty1039.startdedicated.net:5000/cms-demo
 
-.PHONY: help ui backend demo production run test check docker docker-run clean
+.PHONY: help ui backend demo production run test check docker docker-push docker-run clean
 
 help:
 	@echo "make ui         build the React app into cmd/server/web/dist"
@@ -14,6 +15,7 @@ help:
 	@echo "make test       run the Go test suite"
 	@echo "make check      gofmt, vet, and tests"
 	@echo "make docker     build the all-in-one image"
+	@echo "make docker-push build and push the image to the private registry"
 	@echo "make docker-run run the image on :8080"
 	@echo "make clean      remove build output"
 
@@ -50,6 +52,10 @@ check:
 
 docker:
 	docker build -t $(IMAGE):$(TAG) .
+
+docker-push: docker
+	docker tag $(IMAGE):$(TAG) $(REGISTRY_IMAGE):$(TAG)
+	docker push $(REGISTRY_IMAGE):$(TAG)
 
 docker-run:
 	docker run --rm -p 8080:8080 --env-file .env $(IMAGE):$(TAG)
