@@ -39,6 +39,12 @@ jobs:
         run: npm run build
         working-directory: ui/app
 
+      - name: Prepare embedded frontend
+        run: |
+          rm -rf cmd/server/web/dist
+          mkdir -p cmd/server/web/dist
+          cp -R ui/dist/. cmd/server/web/dist/
+
       - name: Run Go tests
         run: go test ./...
 
