@@ -183,7 +183,11 @@ func (h *Handler) contentList(w http.ResponseWriter, r *http.Request) {
 			filtered = append(filtered, badge)
 		}
 	}
-	items, e := h.content.List(r.Context(), limit, offset, strings.TrimSpace(strings.ToLower(r.URL.Query().Get("category"))), filtered)
+	items, e := h.content.List(r.Context(), limit, offset,
+		strings.TrimSpace(strings.ToLower(r.URL.Query().Get("category"))),
+		strings.TrimSpace(strings.ToLower(r.URL.Query().Get("status"))),
+		filtered,
+	)
 	if e != nil {
 		jsonWrite(w, 500, map[string]string{"error": e.Error()})
 		return

@@ -63,11 +63,14 @@ func (r *GORMSessionRepository) FindValid(ctx context.Context, t string) (domain
 type GORMContentRepository struct{ db *gorm.DB }
 
 func NewContentRepository(db *gorm.DB) IContentRepository { return &GORMContentRepository{db} }
-func (r *GORMContentRepository) List(ctx context.Context, limit, offset int, category string, badges []string) ([]domain.Content, error) {
+func (r *GORMContentRepository) List(ctx context.Context, limit, offset int, category, status string, badges []string) ([]domain.Content, error) {
 	var rows []persistence.ContentModel
 	query := r.db.WithContext(ctx).Model(&persistence.ContentModel{}).Preload("Category").Preload("Badges")
 	if category != "" {
 		query = query.Where("category_id IN (SELECT id FROM categories WHERE slug = ?)", category)
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
 	}
 	for _, badge := range badges {
 		query = query.Where("EXISTS (SELECT 1 FROM content_badges cb JOIN badges b ON b.id = cb.badge_id WHERE cb.content_id = content.id AND b.name = ?)", badge)
@@ -112,6 +115,17 @@ func (r *GORMContentRepository) Update(ctx context.Context, d domain.Content, h 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&persistence.ContentModel{}).Where("id = ?", d.ID).Updates(map[string]any{"slug": d.Slug, "title": d.Title, "summary": d.Summary, "body": d.Body, "status": d.Status, "published": d.Published, "updated_at": d.UpdatedAt, "updated_by": d.UpdatedBy}).Error; err != nil {
 			return err
+		}
+		if err := tx.Exec("DELETE FROM content_badges WHERE content_id = ?", d.ID).Error; err != nil {
+			return err
+		}
+		for _, badge := range d.Badges {
+			if err := tx.Exec("INSERT INTO badges (name) VALUES (?) ON CONFLICT (name) DO NOTHING", badge).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec("INSERT INTO content_badges (content_id, badge_id) SELECT ?, id FROM badges WHERE name = ? ON CONFLICT DO NOTHING", d.ID, badge).Error; err != nil {
+				return err
+			}
 		}
 		return tx.Create(&persistence.ContentHistoryModel{ContentID: h.ContentID, Operation: h.Operation, ActorID: h.ActorID, ActorAdminID: h.ActorAdminID, CreatedAt: h.CreatedAt, Snapshot: h.Snapshot}).Error
 	})

@@ -12,7 +12,7 @@ import (
 )
 
 type IContentService interface {
-	List(context.Context, int, int, string, []string) ([]domain.Content, error)
+	List(context.Context, int, int, string, string, []string) ([]domain.Content, error)
 	ListCategories(context.Context) ([]domain.Category, error)
 	ListBadges(context.Context) ([]domain.Badge, error)
 	Get(context.Context, string) (domain.Content, error)
@@ -26,7 +26,7 @@ type ContentService struct {
 func NewContentService(r repository.IContentRepository, a *AuthService) *ContentService {
 	return &ContentService{repo: r, auth: a}
 }
-func (s *ContentService) List(ctx context.Context, limit, offset int, category string, badges []string) ([]domain.Content, error) {
+func (s *ContentService) List(ctx context.Context, limit, offset int, category, status string, badges []string) ([]domain.Content, error) {
 	if limit < 1 {
 		limit = 20
 	}
@@ -36,7 +36,7 @@ func (s *ContentService) List(ctx context.Context, limit, offset int, category s
 	if offset < 0 {
 		offset = 0
 	}
-	return s.repo.List(ctx, limit, offset, category, badges)
+	return s.repo.List(ctx, limit, offset, category, status, badges)
 }
 func (s *ContentService) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	return s.repo.ListCategories(ctx)
@@ -65,15 +65,34 @@ func (s *ContentService) Update(ctx context.Context, c domain.Content, session d
 	c.CreatedAt = old.CreatedAt
 	c.CreatedBy = old.CreatedBy
 	c.UpdatedAt = time.Now()
+	c.Badges = normalizeBadges(c.Badges)
 	if session.UserID != nil {
 		c.UpdatedBy = *session.UserID
 	}
+
 	snapshot, _ := json.Marshal(c)
 	h := domain.ContentHistory{ContentID: c.ID, Operation: "updated", CreatedAt: c.UpdatedAt, Snapshot: string(snapshot), ActorID: session.UserID, ActorAdminID: session.AdminID}
 	if err = s.repo.Update(ctx, c, h); err != nil {
 		return domain.Content{}, err
 	}
 	return c, nil
+}
+
+func normalizeBadges(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" || len(value) > 100 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 var slugRE = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)

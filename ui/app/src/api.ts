@@ -100,10 +100,11 @@ async function contentRequest<T>(path = '', init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function listContent(cursor?: string | null, category = '', badges: string[] = []): Promise<ContentListResponse> {
+export async function listContent(cursor?: string | null, category = '', status = '', badges: string[] = []): Promise<ContentListResponse> {
   const params = new URLSearchParams()
   if (cursor) params.set('offset', cursor)
   if (category) params.set('category', category)
+  if (status) params.set('status', status)
   badges.forEach(badge => params.append('badge', badge))
   const query = params.toString() ? `?${params.toString()}` : ''
   const response = await contentRequest<ContentListResponse | (Content & { ID?: string; Slug?: string; Title?: string; Summary?: string; Body?: string; Status?: string })[]>(query)
@@ -131,7 +132,7 @@ export function getContent(id: string): Promise<Content> {
   return contentRequest<Content>(`/${encodeURIComponent(id)}`).then(value => normalizeContent(value as Content & { ID?: string; Slug?: string; Title?: string; Summary?: string; Body?: string; Status?: string }))
 }
 
-export type ContentUpdate = Pick<Content, 'title' | 'summary' | 'body' | 'status'>
+export type ContentUpdate = Pick<Content, 'title' | 'summary' | 'body' | 'status' | 'badges'>
 
 export function updateContent(id: string, content: ContentUpdate): Promise<Content> {
   return contentRequest<Content>(`/${encodeURIComponent(id)}`, {

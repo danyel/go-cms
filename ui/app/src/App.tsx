@@ -6,7 +6,7 @@ import { useAuth } from './auth'
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth()
   return <main className="shell">
-    <header className="header"><Link className="brand" to="/">CMS</Link>{user && <button className="text-button" onClick={() => void signOut()}>Sign out</button>}</header>
+    <header className="header"><Link className="brand" to="/"><span className="brand-prompt">~/</span> Urpi's backlog<span className="brand-cursor">_</span><small>linux · go · java · ideas</small></Link>{user && <button className="text-button" onClick={() => void signOut()}>Sign out</button>}</header>
     {children}
   </main>
 }
@@ -16,8 +16,8 @@ function Login() {
   if (user) return <Navigate to="/protected" replace />
   if (loading) return <Shell><div className="card"><p>Checking your session…</p></div></Shell>
   return <Shell><section className="card auth-card">
-    <span className="eyebrow">Welcome</span><h1>Sign in to CMS</h1>
-    <p className="muted">Sign in securely with your external identity provider.</p>
+    <span className="eyebrow">Welcome, developer</span><h1>Sign in to Urpi's backlog</h1>
+    <p className="muted">A cozy backlog for Linux, Go, Java, and the ideas between them.</p>
     {error && <p className="error" role="alert">{error}</p>}
     <button className="google-button" onClick={() => void signIn()}><span aria-hidden="true">G</span> Continue with Google</button>
   </section></Shell>
@@ -49,19 +49,21 @@ function ContentList() {
   const [categories, setCategories] = useState<Category[]>([])
   const [badgeOptions, setBadgeOptions] = useState<Badge[]>([])
   const [category, setCategory] = useState('')
+  const [status, setStatus] = useState('')
   const [badges, setBadges] = useState<string[]>([])
   const [badgeInput, setBadgeInput] = useState('')
   const loadingMore = useRef(false)
   const requestVersion = useRef(0)
   const sentinel = useRef<HTMLDivElement>(null)
+  const filters = { category, status, badges }
 
-  const load = async (next = false) => {
+  const load = async (next = false, activeFilters = filters) => {
     if (loadingMore.current || (next && !cursor)) return
     const version = next ? requestVersion.current : ++requestVersion.current
     loadingMore.current = true
     setLoading(true)
     try {
-      const response = await listContent(next ? cursor : undefined, category, badges)
+      const response = await listContent(next ? cursor : undefined, activeFilters.category, activeFilters.status, activeFilters.badges)
       if (version !== requestVersion.current) return
       const page = Array.isArray(response) ? response : response.items ?? response.content ?? response.data ?? []
       setItems(current => next ? [...current, ...page] : page)
@@ -85,19 +87,28 @@ function ContentList() {
     loadingMore.current = false
     setItems([])
     setCursor(undefined)
-    void load()
-  }, [category, badges.join(',')])
+    void load(false, { category, status, badges })
+  }, [category, status, badges.join(',')])
   useEffect(() => {
     const node = sentinel.current
     if (!node) return
     const observer = new IntersectionObserver(entries => { if (entries[0]?.isIntersecting) void load(true) }, { rootMargin: '240px' })
     observer.observe(node)
     return () => observer.disconnect()
-  }, [cursor])
+  }, [cursor, category, status, badges.join(',')])
 
   return <Shell><section className="content-page">
     <div className="page-heading"><div><span className="eyebrow">Journal</span><h1>Latest content</h1></div></div>
     <div className="filters" aria-label="Content filters">
+      <label className="status-filter">Status
+        <select value={status} onChange={event => setStatus(event.target.value)}>
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+          <option value="review">Review</option>
+          <option value="archived">Archived</option>
+        </select>
+      </label>
       <label className="category-filter">Category
         <select value={category} onChange={event => setCategory(event.target.value)}>
           <option value="">All categories</option>
@@ -135,11 +146,19 @@ function ContentDetail() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [badgeOptions, setBadgeOptions] = useState<Badge[]>([])
+  const [badgeInput, setBadgeInput] = useState('')
   const navigate = useNavigate()
   useEffect(() => {
     let active = true
     setLoading(true)
-    void getContent(id).then(value => { if (active) { setItem(value); setDraft({ title: value.title, summary: value.summary, body: value.body, status: value.status }) } })
+    void Promise.all([getContent(id), listBadges()]).then(([value, options]) => {
+      if (active) {
+        setItem(value)
+        setBadgeOptions(options)
+        setDraft({ title: value.title, summary: value.summary, body: value.body, status: value.status, badges: value.badges ?? [] })
+      }
+    })
       .catch(err => active && setError(err instanceof Error ? err.message : 'Unable to load content.'))
       .finally(() => active && setLoading(false))
     return () => { active = false }
@@ -148,7 +167,7 @@ function ContentDetail() {
   if (error || !item || !draft) return <Shell><div className="card"><p className="error" role="alert">{error ?? 'Content not found.'}</p><Link to="/content">Back to content</Link></div></Shell>
   const save = async () => {
     setSaving(true); setError(null)
-    try { const saved = await updateContent(id, draft); setItem(saved); setDraft({ title: saved.title, summary: saved.summary, body: saved.body, status: saved.status }); setEditing(false) }
+    try { const saved = await updateContent(id, draft); setItem(saved); setDraft({ title: saved.title, summary: saved.summary, body: saved.body, status: saved.status, badges: saved.badges ?? [] }); setEditing(false) }
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to save changes.') }
     finally { setSaving(false) }
   }
@@ -160,8 +179,21 @@ function ContentDetail() {
       <label>Summary<textarea rows={3} value={draft.summary} onChange={e => setDraft({ ...draft, summary: e.target.value })} /></label>
       <label>Body<textarea rows={12} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} /></label>
       <label>Status<select value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></label>
+      <label>Badges
+        <div className="badge-input">
+          {(draft.badges ?? []).map(badge => <span className="filter-pill" key={badge}>{badge}<button type="button" aria-label={`Remove ${badge}`} onClick={() => setDraft({ ...draft, badges: (draft.badges ?? []).filter(value => value !== badge) })}>×</button></span>)}
+          <input list="detail-badge-options" value={badgeInput} placeholder="Type a badge and press Enter" onChange={e => setBadgeInput(e.target.value)} onKeyDown={e => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            const badge = badgeInput.trim().toLowerCase()
+            if (badge && !(draft.badges ?? []).includes(badge)) setDraft({ ...draft, badges: [...(draft.badges ?? []), badge] })
+            setBadgeInput('')
+          }} />
+          <datalist id="detail-badge-options">{badgeOptions.filter(option => !(draft.badges ?? []).includes(option.name)).map(option => <option value={option.name} key={option.id} />)}</datalist>
+        </div>
+      </label>
       <div className="actions"><button className="primary-button" disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save changes'}</button><button className="secondary-button" onClick={() => setEditing(false)}>Cancel</button></div>
-    </div> : <><div className="detail-heading"><span className="status">{item.status}</span><h1>{item.title}</h1><p className="muted">{item.summary}</p>{canEdit && <button className="primary-button edit-button" onClick={() => setEditing(true)}>Edit</button>}</div><div className="body-copy">{item.body}</div></>}
+    </div> : <><div className="detail-heading"><span className="status">{item.status}</span><h1>{item.title}</h1><p className="muted">{item.summary}</p>{item.badges && item.badges.length > 0 && <div className="badge-list">{item.badges.map(badge => <span className="badge" key={badge}>{badge}</span>)}</div>}{canEdit && <button className="primary-button edit-button" onClick={() => setEditing(true)}>Edit</button>}</div><div className="body-copy">{item.body}</div></>}
   </article></Shell>
 }
 

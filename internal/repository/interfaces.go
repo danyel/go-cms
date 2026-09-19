@@ -19,7 +19,7 @@ type ISessionRepository interface {
 	FindValid(context.Context, string) (domain.Session, error)
 }
 type IContentRepository interface {
-	List(context.Context, int, int, string, []string) ([]domain.Content, error)
+	List(context.Context, int, int, string, string, []string) ([]domain.Content, error)
 	ListCategories(context.Context) ([]domain.Category, error)
 	ListBadges(context.Context) ([]domain.Badge, error)
 	FindBySlug(context.Context, string) (domain.Content, error)
