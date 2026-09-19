@@ -58,3 +58,28 @@ repositories, migrations, and pages.
 - Exposed the authenticated user and generic capabilities in the session
   response; no admin link was added to user-facing navigation.
 - Revalidated with `go test ./...`, `npm run typecheck`, and `npm run build`.
+
+## 2026-09-19 — Single sign-on
+
+### Prompt
+
+Change the security model: the owner is the only person who enters the application, so use SSO.
+When the token is absent the visitor is anonymous; when it is present the owner can change the
+application. Remove sign-in entirely, along with the admin database and the setup.
+
+### Tasks completed
+
+- Replaced the Google OAuth flow, direct login, and admin login with a single SSO seam: the
+  upstream identity-aware proxy authenticates the owner and the backend verifies the forwarded
+  header (`internal/security`).
+- Removed the identity package, the auth service, the SQLite admin database, the admin migrations,
+  the admin login route, and every Google/OAuth setting and credential file.
+- Reads are anonymous; `PUT /api/content/:slug` returns `401` unless the SSO header is present.
+- Added the `GET /api/auth/session` capability response (`authenticated`, `canEdit`), which is
+  `false`/`false` for anonymous visitors and `true`/`true` for the owner.
+- Dropped `users`, `sessions`, and all actor columns from PostgreSQL through migration `004_sso`;
+  content history keeps its snapshot timeline without an actor.
+- Reworked the React app: no sign-in screen or sign-out button, public content browsing, an
+  SSO/anonymous mode badge in the header, and an Edit button gated on `canEdit`.
+- Added backend tests for anonymous read-only access and proxy-authenticated editing.
+- Revalidated with `gofmt`, `go build ./...`, `go test ./...`, `npm run typecheck`, and `npm run build`.

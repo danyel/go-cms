@@ -11,20 +11,21 @@ import (
 	"time"
 )
 
+// IContentService exposes the content use cases. Read operations are anonymous;
+// Update is only reachable once the web layer verified the SSO proxy identity.
 type IContentService interface {
 	List(context.Context, int, int, string, string, []string) ([]domain.Content, error)
 	ListCategories(context.Context) ([]domain.Category, error)
 	ListBadges(context.Context) ([]domain.Badge, error)
 	Get(context.Context, string) (domain.Content, error)
-	Update(context.Context, domain.Content, domain.Session) (domain.Content, error)
+	Update(context.Context, domain.Content) (domain.Content, error)
 }
 type ContentService struct {
 	repo repository.IContentRepository
-	auth *AuthService
 }
 
-func NewContentService(r repository.IContentRepository, a *AuthService) *ContentService {
-	return &ContentService{repo: r, auth: a}
+func NewContentService(r repository.IContentRepository) *ContentService {
+	return &ContentService{repo: r}
 }
 func (s *ContentService) List(ctx context.Context, limit, offset int, category, status string, badges []string) ([]domain.Content, error) {
 	if limit < 1 {
@@ -50,10 +51,7 @@ func (s *ContentService) Get(ctx context.Context, slug string) (domain.Content, 
 	}
 	return s.repo.FindBySlug(ctx, slug)
 }
-func (s *ContentService) Update(ctx context.Context, c domain.Content, session domain.Session) (domain.Content, error) {
-	if s.auth == nil || !s.auth.CanEdit(ctx, session) {
-		return domain.Content{}, errors.New("forbidden")
-	}
+func (s *ContentService) Update(ctx context.Context, c domain.Content) (domain.Content, error) {
 	if !validSlug(c.Slug) || strings.TrimSpace(c.Title) == "" || strings.TrimSpace(c.Body) == "" {
 		return domain.Content{}, errors.New("invalid content")
 	}
@@ -63,15 +61,11 @@ func (s *ContentService) Update(ctx context.Context, c domain.Content, session d
 	}
 	c.ID = old.ID
 	c.CreatedAt = old.CreatedAt
-	c.CreatedBy = old.CreatedBy
 	c.UpdatedAt = time.Now()
 	c.Badges = normalizeBadges(c.Badges)
-	if session.UserID != nil {
-		c.UpdatedBy = *session.UserID
-	}
 
 	snapshot, _ := json.Marshal(c)
-	h := domain.ContentHistory{ContentID: c.ID, Operation: "updated", CreatedAt: c.UpdatedAt, Snapshot: string(snapshot), ActorID: session.UserID, ActorAdminID: session.AdminID}
+	h := domain.ContentHistory{ContentID: c.ID, Operation: "updated", CreatedAt: c.UpdatedAt, Snapshot: string(snapshot)}
 	if err = s.repo.Update(ctx, c, h); err != nil {
 		return domain.Content{}, err
 	}

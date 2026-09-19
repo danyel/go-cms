@@ -2,12 +2,11 @@
 bin/
 *.test
 
-# Local databases and secrets
+# Local environment and data
+.env
 *.db
 *.sqlite
 *.sqlite3
-.env
-client_secret*.json
 
 # Node
 node_modules/
@@ -18,7 +17,3 @@ ui/app/.vite/
 .idea/
 .vscode/
 .DS_Store
-
-# Local backend data
-*.db
-*.db-*

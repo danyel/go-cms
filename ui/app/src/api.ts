@@ -6,21 +6,16 @@ export type User = {
   capabilities?: Record<string, boolean>
 }
 
+// The backend never signs users in: an upstream SSO proxy asserts the owner's
+// identity. The session endpoint only reports whether that identity is present.
 export type SessionResponse = {
   authenticated?: boolean
-  user?: User
-  capabilities?: Record<string, boolean>
   canEdit?: boolean
-  token?: string
-  accessToken?: string
-  sessionToken?: string
 }
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 export const apiConfig = {
-  google: import.meta.env.VITE_GOOGLE_AUTH_ENDPOINT ?? '/api/auth/google',
   session: import.meta.env.VITE_SESSION_ENDPOINT ?? '/api/auth/session',
-  logout: import.meta.env.VITE_LOGOUT_ENDPOINT ?? '/api/auth/logout',
   content: import.meta.env.VITE_CONTENT_ENDPOINT ?? '/api/content',
 }
 
@@ -34,30 +29,11 @@ export async function requestSession(): Promise<SessionResponse | null> {
     credentials: 'include',
     headers: { Accept: 'application/json' },
   })
-  if (response.status === 401 || response.status === 404) return null
+  if (response.status === 404) return null
   if (!response.ok) throw new Error('Unable to check your session.')
-  const value = (await response.json()) as SessionResponse & { CanEdit?: boolean; User?: User }
-  if (value.User && !value.user) value.user = value.User
+  const value = (await response.json()) as SessionResponse & { CanEdit?: boolean }
   if (value.canEdit === undefined && value.CanEdit !== undefined) value.canEdit = value.CanEdit
-  if (value.user) value.user = normalizeUser(value.user)
   return value
-}
-
-function normalizeUser(value: User & { ID?: string; Email?: string; Name?: string; Editor?: boolean }): User {
-  return { id: value.id ?? value.ID, email: value.email ?? value.Email, name: value.name ?? value.Name, picture: value.picture, capabilities: { ...(value.capabilities ?? {}), ...(value.Editor === true ? { canEdit: true } : {}) } }
-}
-
-export async function signInWithGoogle(): Promise<SessionResponse> {
-  window.location.assign(apiUrl(apiConfig.google))
-  return {}
-}
-
-export async function signOut() {
-  await fetch(apiUrl(apiConfig.logout), {
-    method: 'POST',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  })
 }
 
 export type Content = {
@@ -94,7 +70,7 @@ async function contentRequest<T>(path = '', init?: RequestInit): Promise<T> {
     headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
   })
   if (!response.ok) {
-    if (response.status === 401) throw new Error('Please sign in to view content.')
+    if (response.status === 401) throw new Error('Your SSO session is required to edit content.')
     throw new Error((await response.text()) || 'Unable to load content.')
   }
   return (await response.json()) as T
