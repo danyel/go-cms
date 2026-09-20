@@ -4,12 +4,12 @@ image:
 
 app:
   environment: demo
-  allowedOrigins: http://localhost:30081
+  allowedOrigins: http://localhost:30010
   contentFile: ""
 
 service:
   type: NodePort
-  nodePort: 30081
+  nodePort: 30010
 
 ingress:
   enabled: false

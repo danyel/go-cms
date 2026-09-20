@@ -3,7 +3,7 @@ image:
   pullPolicy: IfNotPresent
 
 app:
-  environment: production
+  environment: demo
   allowedOrigins: https://cms.urpi.be
   contentFile: /data/content.json
 

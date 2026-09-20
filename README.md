@@ -4,7 +4,9 @@ This repository contains a Go backend and React frontend for the CMS.
 
 ## Backend
 
-The backend targets Go 1.27.1 and uses a layered design (`internal/web`, `service`, `repository`, `persistence`, `security`, and `domain`). A single PostgreSQL database stores content; Goose migrations run automatically at startup.
+The backend targets Go 1.27.1 and uses a layered design (`internal/web`,
+`service`, and `security`). Content is seeded in memory and can be mirrored to
+a JSON file configured through `CMS_CONTENT_FILE`.
 
 ```sh
 go run ./cmd/server
@@ -32,10 +34,33 @@ Content supports one reusable category per document plus any number of badges. T
 Editing requires the SSO identity: `PUT /api/content/:slug` returns `401` without it. `GET /api/content/:slug` and the taxonomy endpoints are public.
 
 ```sh
-make up        # start PostgreSQL
-make migrate   # apply the PostgreSQL migrations
-make seed      # load repeatable sample content
 make backend   # run the Go server
 make frontend  # run the React app
-make dev       # up + migrate + backend + frontend
+make run       # build the frontend, then run the server
 ```
+
+## Rancher deployment
+
+The Helm chart at `deploy/helm/cms` provides two profiles:
+
+- `values-development.yaml` runs the demo profile on NodePort `30081` with
+  ephemeral content.
+- `values-production.yaml` runs the seeded demo application on NodePort
+  `31373` with a persistent content volume. Host Nginx proxies `cms.urpi.be`
+  to this port.
+
+Validate or deploy either profile with:
+
+```sh
+make helm-lint
+make helm-deploy-development
+make helm-deploy-production
+```
+
+The deploy workflow automatically deploys a successful `main` image build to
+production and also supports manual development or production deployments.
+Create GitHub environments named `development` and `production`. Each needs
+the secrets `RANCHER_KUBE_CONFIG_BASE64`, `REGISTRY_USERNAME`, and
+`REGISTRY_PASSWORD`. `CMS_SSO_TOKEN` is optional. Environment variables
+`RANCHER_NAMESPACE`, `CMS_ALLOWED_ORIGINS`, `CMS_SSO_HEADER`, and
+`CMS_SSO_COOKIE` can override the chart defaults.

@@ -7,7 +7,7 @@ HELM ?= helm
 HELM_CHART := deploy/helm/cms
 HELM_RELEASE ?= cms
 HELM_NAMESPACE ?= cms
-KUBECONFIG ?= $(HOME)/.config/kubectl/rancher.urpi.local.yaml
+KUBECONFIG ?= $(HOME)/.config/kubectl/rancher.urpi.be.yaml
 
 .PHONY: help ui frontend backend demo production run test check docker docker-push docker-run clean rancher-storage helm-lint helm-deploy-development helm-deploy-production
 
