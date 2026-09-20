@@ -7,23 +7,32 @@ HELM ?= helm
 HELM_CHART := deploy/helm/cms
 HELM_RELEASE ?= cms
 HELM_NAMESPACE ?= cms
-KUBECONFIG ?= $(HOME)/.config/kubectl/rancher.urpi.be.yaml
+KUBECONFIG_DEV ?= $(HOME)/.config/kubectl/rancher.urpi.local.yaml
+KUBECONFIG_PRD ?= $(HOME)/.config/kubectl/rancher.urpi.be.yaml
 
-.PHONY: help ui frontend backend demo production run test check docker docker-push docker-run clean rancher-storage helm-lint helm-deploy-development helm-deploy-production
+.PHONY: help ui frontend backend demo production run test check docker docker-push docker-run clean rancher-storage helm-lint helm-deploy-development helm-deploy-production helm-down-development helm-down-production helm-proxy-development helm-proxy-production
 
 help:
-	@echo "make ui         build the React app into cmd/server/web/dist"
-	@echo "make frontend   run the Vite UI with API changes proxied to :8080"
-	@echo "make backend    run the Go server on :8080 (serves the last UI build)"
-	@echo "make demo       run the in-memory demo profile"
-	@echo "make production run the SSO production profile"
-	@echo "make run        build the UI, then run the server"
-	@echo "make test       run the Go test suite"
-	@echo "make check      gofmt, vet, and tests"
-	@echo "make docker     build the all-in-one image"
-	@echo "make docker-push build and push the image to the private registry"
-	@echo "make docker-run run the image on :8080"
-	@echo "make clean      remove build output"
+	@echo "make ui         					build the React app into cmd/server/web/dist"
+	@echo "make frontend   					run the Vite UI with API changes proxied to :8080"
+	@echo "make backend    					run the Go server on :8080 (serves the last UI build)"
+	@echo "make demo       					run the in-memory demo profile"
+	@echo "make production 					run the SSO production profile"
+	@echo "make run        					build the UI, then run the server"
+	@echo "make test       					run the Go test suite"
+	@echo "make check      					gofmt, vet, and tests"
+	@echo "make docker     					build the all-in-one image"
+	@echo "make docker-push					 build and push the image to the private registry"
+	@echo "make docker-run 					run the image on :8080"
+	@echo "make clean      					remove build output"
+	@echo "make rancher-storage      		make rancher storage"
+	@echo "make helm-lint      				linting the helm charts"
+	@echo "make helm-deploy-development		deploy to development"
+	@echo "make helm-deploy-production      deploy to production"
+	@echo "make helm-down-development      	development down"
+	@echo "make helm-down-production      	production down"
+	@echo "make helm-proxy-development      proxy development"
+	@echo "make helm-proxy-production      	proxy production"
 
 # The Go server embeds the compiled frontend, so the UI is built first and copied
 # into the embed directory that cmd/server/main.go points at.
@@ -77,7 +86,7 @@ clean:
 	mkdir -p cmd/server/web/dist
 	printf 'Placeholder so the Go embed directive resolves before the frontend is built.\nRun `make ui` to replace this directory with the real React build.\n' > cmd/server/web/dist/placeholder.txt
 rancher-storage:
-	KUBECONFIG="$(KUBECONFIG)" kubectl apply -f deploy/rancher/local-path.yaml
+	KUBECONFIG="$(KUBECONFIG_DEV)" kubectl apply -f deploy/rancher/local-path.yaml
 
 helm-lint:
 	$(HELM) lint $(HELM_CHART) -f $(HELM_CHART)/values-development.yaml
@@ -88,13 +97,24 @@ helm-lint:
 		-f $(HELM_CHART)/values-production.yaml >/dev/null
 
 helm-deploy-development:
-	KUBECONFIG="$(KUBECONFIG)" $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
+	KUBECONFIG="$(KUBECONFIG_DEV)" $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
 		--namespace $(HELM_NAMESPACE)-development --create-namespace \
 		-f $(HELM_CHART)/values-development.yaml \
-		--atomic --wait --timeout 10m
+		--rollback-on-failure --wait --timeout 10m
 
 helm-deploy-production:
-	KUBECONFIG="$(KUBECONFIG)" $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
+	KUBECONFIG="$(KUBECONFIG_PRD)" $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
 		--namespace $(HELM_NAMESPACE)-production --create-namespace \
 		-f $(HELM_CHART)/values-production.yaml \
-		--atomic --wait --timeout 10m
+		--rollback-on-failure --wait --timeout 10m
+
+helm-down-production:
+	KUBECONFIG="$(KUBECONFIG_PRD)" $(HELM) uninstall $(HELM_RELEASE) -n $(HELM_NAMESPACE)-production
+
+helm-down-development:
+	KUBECONFIG="$(KUBECONFIG_DEV)" $(HELM) uninstall $(HELM_RELEASE) -n $(HELM_NAMESPACE)-development
+
+helm-proxy-production:
+	KUBECONFIG="$(KUBECONFIG_DEV)" kubectl port-forward -n $(HELM_NAMESPACE)-production deployment/$(HELM_RELEASE) 31373:8080 --address 0.0.0.0
+helm-proxy-development:
+	KUBECONFIG="$(KUBECONFIG_PRD)" kubectl port-forward -n $(HELM_NAMESPACE)-development deployment/$(HELM_RELEASE) 30010:8080 --address 0.0.0.0
