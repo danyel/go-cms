@@ -1,0 +1,26 @@
+image:
+  tag: latest
+  pullPolicy: Always
+
+app:
+  environment: demo
+  allowedOrigins: http://localhost:30081
+  contentFile: ""
+
+service:
+  type: NodePort
+  nodePort: 30081
+
+ingress:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 300m
+    memory: 384Mi
+
+persistence:
+  enabled: false

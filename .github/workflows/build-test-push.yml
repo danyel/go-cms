@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: batty1039.startdedicated.net:5000/cms-demo
+  IMAGE_NAME: batty1039.startdedicated.net:5000/cms
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:

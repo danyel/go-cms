@@ -1,0 +1,12 @@
+CMS has been installed in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+Open the host configured in ingress.hosts.
+{{- else if eq .Values.service.type "NodePort" }}
+The application is exposed on cluster node port {{ .Values.service.nodePort }}.
+Open it through the configured external reverse proxy.
+{{- else }}
+Run:
+  kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "cms.fullname" . }} 8080:{{ .Values.service.port }}
+Then open http://127.0.0.1:8080.
+{{- end }}

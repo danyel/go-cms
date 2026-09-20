@@ -1,0 +1,148 @@
+name: Deploy to Rancher
+
+on:
+  workflow_run:
+    workflows:
+      - Build, test, and publish
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - production
+      image_tag:
+        description: Image tag (defaults to latest)
+        required: false
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cms-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
+    name: Deploy ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    env:
+      TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+      KUBE_CONFIG_BASE64: ${{ secrets.RANCHER_KUBE_CONFIG_BASE64 }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      CMS_SSO_TOKEN: ${{ secrets.CMS_SSO_TOKEN }}
+      CMS_ALLOWED_ORIGINS: ${{ vars.CMS_ALLOWED_ORIGINS }}
+      CMS_SSO_HEADER: ${{ vars.CMS_SSO_HEADER }}
+      CMS_SSO_COOKIE: ${{ vars.CMS_SSO_COOKIE }}
+      RANCHER_NAMESPACE: ${{ vars.RANCHER_NAMESPACE }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.34.1
+
+      - name: Resolve deployment settings
+        env:
+          REQUESTED_TAG: ${{ inputs.image_tag }}
+          PUBLISHED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          if [ -z "$KUBE_CONFIG_BASE64" ]; then
+            echo "RANCHER_KUBE_CONFIG_BASE64 is required" >&2
+            exit 1
+          fi
+          if [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
+            echo "REGISTRY_USERNAME and REGISTRY_PASSWORD are required" >&2
+            exit 1
+          fi
+          namespace="${RANCHER_NAMESPACE:-cms-$TARGET_ENVIRONMENT}"
+          if [ -n "$PUBLISHED_SHA" ]; then
+            image_tag="$PUBLISHED_SHA"
+          else
+            image_tag="${REQUESTED_TAG:-latest}"
+          fi
+          allowed_origins="$CMS_ALLOWED_ORIGINS"
+          if [ -z "$allowed_origins" ]; then
+            if [ "$TARGET_ENVIRONMENT" = "production" ]; then
+              allowed_origins="https://cms.urpi.be"
+            else
+              allowed_origins="http://localhost:30081"
+            fi
+          fi
+          {
+            echo "DEPLOY_NAMESPACE=$namespace"
+            echo "IMAGE_TAG=$image_tag"
+            echo "RESOLVED_ALLOWED_ORIGINS=$allowed_origins"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure Rancher cluster access
+        run: |
+          set -eu
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG_BASE64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl cluster-info
+
+      - name: Configure registry credentials
+        run: |
+          set -eu
+          kubectl create namespace "$DEPLOY_NAMESPACE" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$DEPLOY_NAMESPACE" create secret docker-registry cms-registry \
+            --docker-server=batty1039.startdedicated.net:5000 \
+            --docker-username="$REGISTRY_USERNAME" \
+            --docker-password="$REGISTRY_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy Helm release
+        run: |
+          set -eu
+          values_file="deploy/helm/cms/values-$TARGET_ENVIRONMENT.yaml"
+          set -- \
+            --set-string "image.tag=$IMAGE_TAG" \
+            --set "imagePullSecrets[0].name=cms-registry" \
+            --set-string "app.allowedOrigins=$RESOLVED_ALLOWED_ORIGINS" \
+            --set-string "secrets.ssoToken=$CMS_SSO_TOKEN"
+          if [ -n "$CMS_SSO_HEADER" ]; then
+            set -- "$@" --set-string "app.ssoHeader=$CMS_SSO_HEADER"
+          fi
+          if [ -n "$CMS_SSO_COOKIE" ]; then
+            set -- "$@" --set-string "app.ssoCookie=$CMS_SSO_COOKIE"
+          fi
+          helm upgrade --install cms deploy/helm/cms \
+            --namespace "$DEPLOY_NAMESPACE" \
+            --values "$values_file" \
+            --atomic \
+            --wait \
+            --timeout 10m \
+            "$@"
+
+      - name: Verify deployment
+        run: |
+          kubectl -n "$DEPLOY_NAMESPACE" rollout status deployment/cms \
+            --timeout=5m
+          helm test cms --namespace "$DEPLOY_NAMESPACE" --logs

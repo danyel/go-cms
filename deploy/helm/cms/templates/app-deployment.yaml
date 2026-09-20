@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cms.fullname" . }}
+  labels:
+    {{- include "cms.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+  selector:
+    matchLabels:
+      {{- include "cms.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: application
+  template:
+    metadata:
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "cms.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: application
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: cms
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: CMS_PROFILE
+              value: {{ .Values.app.environment | quote }}
+            - name: CMS_ALLOWED_ORIGINS
+              value: {{ .Values.app.allowedOrigins | quote }}
+            - name: CMS_CONTENT_FILE
+              value: {{ ternary .Values.app.contentFile "" .Values.persistence.enabled | quote }}
+            - name: CMS_POSTGRES_URL
+              value: {{ .Values.app.postgresURL | quote }}
+            - name: CMS_SSO_HEADER
+              value: {{ .Values.app.ssoHeader | quote }}
+            - name: CMS_SSO_COOKIE
+              value: {{ .Values.app.ssoCookie | quote }}
+            - name: CMS_SSO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cms.secretName" . }}
+                  key: sso-token
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: temporary-files
+              mountPath: /tmp
+            {{- if .Values.persistence.enabled }}
+            - name: content
+              mountPath: /data
+            {{- end }}
+      volumes:
+        - name: temporary-files
+          emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: content
+          persistentVolumeClaim:
+            claimName: {{ include "cms.fullname" . }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

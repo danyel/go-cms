@@ -1,0 +1,76 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: batty1039.startdedicated.net:5000/cms
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+app:
+  environment: production
+  allowedOrigins: http://localhost:8080
+  contentFile: /data/content.json
+  postgresURL: ""
+  ssoHeader: X-SSO-Token
+  ssoCookie: ""
+
+secrets:
+  ssoToken: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  nodePort: null
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: cms.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+
+strategy:
+  type: Recreate
+
+persistence:
+  enabled: true
+  size: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClass: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

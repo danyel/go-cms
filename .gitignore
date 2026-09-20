@@ -12,6 +12,7 @@ cmd/server/web/dist/*
 .env
 data/
 *.json.tmp
+deploy/local.yaml
 
 # Node
 node_modules/

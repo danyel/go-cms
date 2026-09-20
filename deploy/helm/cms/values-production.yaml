@@ -1,0 +1,27 @@
+image:
+  tag: latest
+  pullPolicy: IfNotPresent
+
+app:
+  environment: production
+  allowedOrigins: https://cms.urpi.be
+  contentFile: /data/content.json
+
+service:
+  type: NodePort
+  nodePort: 31373
+
+ingress:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+persistence:
+  enabled: true
+  size: 5Gi

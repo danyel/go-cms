@@ -47,13 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(() => { signInWithGoogle() }, [])
   const sudo = useCallback(async (username: string, password: string) => {
     const result = await sudoLogin(username, password)
-    window.sessionStorage.setItem('cms-demo-token', result.token)
+    window.sessionStorage.setItem('cms-token', result.token)
     setAuthenticated(true)
     setCanEdit(true)
     setUsername(result.user.username)
   }, [])
   const signOut = useCallback(() => {
-    window.sessionStorage.removeItem('cms-demo-token')
+    window.sessionStorage.removeItem('cms-token')
     setAuthenticated(false)
     setCanEdit(false)
     setUsername(undefined)

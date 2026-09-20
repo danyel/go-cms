@@ -54,7 +54,7 @@ export async function requestSession(): Promise<SessionResponse | null> {
 }
 
 function demoAuthHeaders(): Record<string, string> {
-  const token = window.sessionStorage.getItem('cms-demo-token')
+  const token = window.sessionStorage.getItem('cms-token')
   return token ? {Authorization: `Bearer ${token}`} : {}
 }
 
